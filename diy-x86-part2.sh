@@ -28,12 +28,12 @@ sed -i "s/echo 'iptables/echo '# iptables/g" ./package/lean/default-settings/fil
 sed -i "s/echo '\[ -n/echo '# \[ -n/g" ./package/lean/default-settings/files/zzz-default-settings
 
 # 修改版本号-webui
-modelmark=R`TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours`' by xylz0928'
+modelmark=R`TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours`' by Zed-7nian'
 sed -i "s/DISTRIB_REVISION='R[0-9]*\.[0-9]*\.[0-9]*/DISTRIB_REVISION='$modelmark/g" ./package/lean/default-settings/files/zzz-default-settings
 # sed -i 's/$(VERSION_DIST_SANITIZED)/$(VERSION_DIST_SANITIZED)-${modelmark}/g' include/image.mk
-# sed -i 's/$(VERSION_DIST_SANITIZED)/$(VERSION_DIST_SANITIZED)-$(shell TZ=UTC-8 date +%Y.%m.%d)_By_xylz0928/g' include/image.mk
+# sed -i 's/$(VERSION_DIST_SANITIZED)/$(VERSION_DIST_SANITIZED)-$(shell TZ=UTC-8 date +%Y.%m.%d)_By_Zed-7nian/g' include/image.mk
 # echo "DISTRIB_REVISION='${modelmark}'" > ./package/base-files/files/etc/openwrt_release
-# sed -i "s/DISTRIB_REVISION='/DISTRIB_REVISION='$(TZ=UTC-8 date +%Y-%m-%d) by xylz0928 /g" ./package/base-files/files/etc/openwrt_release
+# sed -i "s/DISTRIB_REVISION='/DISTRIB_REVISION='$(TZ=UTC-8 date +%Y-%m-%d) by Zed-7nian /g" ./package/base-files/files/etc/openwrt_release
 
 # 修改tty banner
 echo " -----------------------------------------------------" >> /tmp/mark
@@ -86,8 +86,8 @@ echo "    \________\/    -----------------------------------" >> /tmp/mark
 cat /tmp/mark >> ./package/base-files/files/etc/banner
 
 # 修改版本号-tty
-sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by xylz0928/g" ./package/base-files/files/etc/banner
-# echo ' Built on '$(TZ=UTC-8 date +%Y-%m-%d)' by xylz0928' >> ./package/base-files/files/etc/banner
+sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by Zed_7nian/g" ./package/base-files/files/etc/banner
+# echo ' Built on '$(TZ=UTC-8 date +%Y-%m-%d)' by Zed_7nian' >> ./package/base-files/files/etc/banner
 # echo ' -----------------------------------------------------' >> ./package/base-files/files/etc/banner
 
 # Modify index 
