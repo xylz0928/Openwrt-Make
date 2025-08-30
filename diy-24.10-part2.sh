@@ -38,8 +38,8 @@ echo "echo \"DISTRIB_DESCRIPTION='OP-ImmortalWRT '\" >> /etc/openwrt_release" >>
 
 # Modify os_release
 # echo "sed -i '/OPENWRT_RELEASE/d' /etc/os-release" >> /tmp/release
-echo "echo \"OPENWRT_RELEASE='ImmortalWRT '\" >> /etc/os-release" >> /tmp/release
-echo "echo 'OPENWRT_RELEASE=\"ImmortalWRT \"' >> /etc/os-release" >> /tmp/release
+# echo "echo \"OPENWRT_RELEASE='OP-ImmortalWRT '\" >> /etc/os-release" >> /tmp/release
+echo "echo 'OPENWRT_RELEASE=\"OP-ImmortalWRT \"' >> /etc/os-release" >> /tmp/release
 echo "sed -i \"s/VERSION=\\\".*\\\"/VERSION=\\\"$modelmark_os\\\"/g\" /etc/os-release" >> /tmp/release
 echo "sed -i \"s/PRETTY_NAME=\\\".*\\\"/PRETTY_NAME=\\\"ImmortalWrt $modelmark_os\\\"/g\" /etc/os-release" >> /tmp/release
 echo "sed -i \"s/VERSION_ID=\\\".*\\\"/VERSION_ID=\\\"$modelmark_os_lower\\\"/g\" /etc/os-release" >> /tmp/release
