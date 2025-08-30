@@ -34,7 +34,7 @@ modelmark_os_lower=r$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)_by_zed-7nian
 modelmark=R`TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours`' by Zed-7nian'
 
 echo "sed -i \"s/VERSION=\\\".*\\\"/VERSION=\\\"$modelmark_os\\\"/g\" /etc/os-release" >> /tmp/release
-echo "sed -i \"s/PRETTY_NAME=\\\".*\\\"/PRETTY_NAME=\\\"ImmortalWrt $modelmark_os\\\"/g\" /etc/os-release" >> /tmp/release
+echo "sed -i \"s/PRETTY_NAME=\\\".*\\\"/PRETTY_NAME=\\\"Openwrt-LEDE $modelmark_os\\\"/g\" /etc/os-release" >> /tmp/release
 echo "sed -i \"s/VERSION_ID=\\\".*\\\"/VERSION_ID=\\\"$modelmark_os_lower\\\"/g\" /etc/os-release" >> /tmp/release
 ## Change Links
 echo "sed -i 's|https://openwrt.org/|https://7nian.top/|g' /etc/os-release" >> /tmp/release
