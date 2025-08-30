@@ -37,9 +37,9 @@ echo "sed -i \"s/VERSION=\\\".*\\\"/VERSION=\\\"$modelmark_os\\\"/g\" /etc/os-re
 echo "sed -i \"s/PRETTY_NAME=\\\".*\\\"/PRETTY_NAME=\\\"ImmortalWrt $modelmark_os\\\"/g\" /etc/os-release" >> /tmp/release
 echo "sed -i \"s/VERSION_ID=\\\".*\\\"/VERSION_ID=\\\"$modelmark_os_lower\\\"/g\" /etc/os-release" >> /tmp/release
 ## Change Links
-echo "sed -i 's|https://immortalwrt.org/|https://7nian.top/|g' /etc/os-release" >> /tmp/release
-echo "sed -i 's|https://github.com/immortalwrt/immortalwrt|https://github.com/xylz0928/Openwrt-Make|g' /etc/os-release" >> /tmp/release
-echo "sed -i 's|/discussions|/actions|g' /etc/os-release" >> /tmp/release
+echo "sed -i 's|https://openwrt.org/|https://7nian.top/|g' /etc/os-release" >> /tmp/release
+echo "sed -i 's|https://forum.openwrt.org|https://github.com/xylz0928/Openwrt-Make/actions|g' /etc/os-release" >> /tmp/release
+echo "sed -i 's|https://bugs.openwrt.org|https://github.com/xylz0928/Openwrt-Make/issues|g' /etc/os-release" >> /tmp/release
 echo "exit 0" >> /tmp/release
 
 sed -i '/exit 0/d' ./package/emortal/default-settings/files/99-default-settings
