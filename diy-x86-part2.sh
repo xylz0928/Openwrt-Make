@@ -42,8 +42,8 @@ echo "sed -i 's|https://forum.openwrt.org|https://github.com/xylz0928/Openwrt-Ma
 echo "sed -i 's|https://bugs.openwrt.org|https://github.com/xylz0928/Openwrt-Make/issues|g' /etc/os-release" >> /tmp/release
 echo "exit 0" >> /tmp/release
 
-sed -i '/exit 0/d' ./package/emortal/default-settings/files/99-default-settings
-cat /tmp/release >> ./package/emortal/default-settings/files/99-default-settings
+sed -i '/exit 0/d' ./package/lean/default-settings/files/zzz-default-settings
+cat /tmp/release >> ./package/lean/default-settings/files/zzz-default-settings
 
 sed -i "s/DISTRIB_REVISION='R[0-9]*\.[0-9]*\.[0-9]*/DISTRIB_REVISION='$modelmark/g" ./package/lean/default-settings/files/zzz-default-settings
 # sed -i 's/$(VERSION_DIST_SANITIZED)/$(VERSION_DIST_SANITIZED)-${modelmark}/g' include/image.mk
