@@ -29,7 +29,10 @@ modelmark_os_lower=r$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)_by_zed-7nian
 # 修改版本号-webui
 # Modify openwrt_release
 echo "sed -i '/DISTRIB_RELEASE/d' /etc/openwrt_release" >> /tmp/release
+
 echo "echo \"DISTRIB_RELEASE='R24.5.5'\" >> /etc/openwrt_release" >> /tmp/release
+# echo "echo \"DISTRIB_REVISION='R24.5.5'\" >> /etc/openwrt_release" >> /tmp/release
+
 echo "sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release" >> /tmp/release
 echo "echo \"DISTRIB_DESCRIPTION='OP-ImmortalWRT '\" >> /etc/openwrt_release" >> /tmp/release
 
@@ -51,7 +54,10 @@ cat /tmp/release >> ./package/emortal/default-settings/files/99-default-settings
 
 
 modelmark=R`TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours`' by Zed-7nian'
+
 sed -i "s/DISTRIB_RELEASE='R[0-9]*\.[0-9]*\.[0-9]*/DISTRIB_RELEASE='$modelmark/g" ./package/emortal/default-settings/files/99-default-settings
+# sed -i "s/DISTRIB_RELEASE='R[0-9]*\.[0-9]*\.[0-9]*/DISTRIB_REVISION='$modelmark/g" ./package/emortal/default-settings/files/99-default-settings
+
 sed -i "s/OP-ImmortalWRT /OP-ImmortalWRT $modelmark/g" ./package/emortal/default-settings/files/99-default-settings
 # sed -i 's/$(VERSION_DIST_SANITIZED)/$(VERSION_DIST_SANITIZED)-${modelmark}/g' include/image.mk
 # sed -i 's/$(VERSION_DIST_SANITIZED)/$(VERSION_DIST_SANITIZED)-$(shell TZ=UTC-8 date +%Y.%m.%d)_By_Zed-7nian/g' include/image.mk
