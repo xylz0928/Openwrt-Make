@@ -136,7 +136,7 @@ jobs:
     - name: Switch GCC/GXX Version
       uses: xylz0928/SwitchUbuntuGccGxxVersion@v1.0.7
       with:
-        TargetVer: '10'
+        TargetVer: '13'
 
     - name: Clone source code
       working-directory: ./
