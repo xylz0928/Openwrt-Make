@@ -49,7 +49,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
     - name: Check Server Hardware
@@ -136,7 +136,7 @@ jobs:
     - name: Switch GCC/GXX Version
       uses: xylz0928/SwitchUbuntuGccGxxVersion@v1.0.7
       with:
-        TargetVer: '14'
+        TargetVer: '10'
 
     - name: Clone source code
       working-directory: ./
