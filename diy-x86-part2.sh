@@ -194,7 +194,7 @@ git clone https://github.com/OpenWrt-Actions/luci-app-vssr.git package/luci-app-
 
 # Add Hello World SSR Plus+
 git clone -b master https://github.com/fw876/helloworld.git package/helloworld
-rm -rf ./package/helloworld/shadowsocksr-libev
+# rm -rf ./package/helloworld/shadowsocksr-libev
 
 # mkdir package/tmp_helloworld
 # mkdir package/tmp_helloworld/shadowsocksr-libev
@@ -215,7 +215,7 @@ git clone https://github.com/jerrykuku/lua-maxminddb.git package/lean/lua-maxmin
 
 # Add Passwall
 # Dependencies
-# git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
+git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
 #Passwall
 git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
 #Passwall2
