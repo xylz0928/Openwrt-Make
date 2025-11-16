@@ -15,23 +15,6 @@
 
 # sed -i -e '/^#/d' feeds.conf.default
 
-# Change uwsgi
-mkdir package/uwsgi
-cd package/uwsgi
-
-git init
-git remote add origin https://github.com/immortalwrt/packages.git
-git config core.sparsecheckout true
-echo "net/uwsgi/*" >> .git/info/sparse-checkout
-git pull origin master
-
-rm -rf net/uwsgi/files-luci-support
-cd ../..
-cp -r feeds/packages/net/uwsgi/files-luci-support package/uwsgi/net/uwsgi/
-rm -rf feeds/packages/net/uwsgi/*
-mv package/uwsgi/net/uwsgi/* feeds/packages/net/uwsgi/
-rm -rf package/uwsgi
-
 # Add a feed source
 # sed -i '$a src-git lienol https://github.com/Lienol/openwrt-package' feeds.conf.default
 # sed -i 's/#src-git helloworld/src-git helloworld/g' ./feeds.conf.default
