@@ -10,6 +10,22 @@
 # Description: OpenWrt DIY script part 2 (After Update feeds)
 #
 
+# Change uwsgi
+mkdir package/uwsgi
+cd package/uwsgi
+
+git init
+git remote add origin https://github.com/immortalwrt/packages.git
+git config core.sparsecheckout true
+echo "net/uwsgi/*" >> .git/info/sparse-checkout
+git pull origin master
+
+rm -rf net/uwsgi/files-luci-support
+cd ../..
+cp -r feeds/packages/net/uwsgi/files-luci-support package/uwsgi/net/uwsgi/
+rm -rf feeds/packages/net/uwsgi/*
+mv package/uwsgi/net/uwsgi/* feeds/packages/net/uwsgi/
+rm -rf package/uwsgi
 
 # 切换ramips内核为 5.10
 # sed -i 's/5.4/5.10/g' ./target/linux/ramips/Makefile
