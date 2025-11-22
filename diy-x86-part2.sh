@@ -190,7 +190,7 @@ git clone https://github.com/brvphoenix/luci-app-wrtbwmon package/luci-app-wrtbw
 git clone https://github.com/rufengsuixing/luci-app-onliner.git package/luci-app-onliner
 
 # Add OpenAppFilter
-# git clone https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter
+git clone https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter
 
 # Add Dockerman
 # git clone https://github.com/lisaac/luci-app-dockerman package/luci-app-dockerman
