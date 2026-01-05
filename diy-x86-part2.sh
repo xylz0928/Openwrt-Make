@@ -378,11 +378,12 @@ git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-ni
 
 mkdir package/luci-app-openclash
 cd package/luci-app-openclash
-git init
-git remote add -f origin https://github.com/vernesong/OpenClash
-git config core.sparseCheckout true
-echo "luci-app-openclash" >> .git/info/sparse-checkout
-git pull origin master
+git clone --depth=1 https://github.com/vernesong/OpenClash.git
+# git init
+# git remote add -f origin https://github.com/vernesong/OpenClash
+# git config core.sparseCheckout true
+# echo "luci-app-openclash" >> .git/info/sparse-checkout
+# git pull origin master
 cd ../../
 
 # Fix Multi-use on one physical port 
