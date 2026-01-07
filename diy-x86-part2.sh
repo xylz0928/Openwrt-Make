@@ -368,6 +368,9 @@ echo "luci-app-bypass" >> .git/info/sparse-checkout
 git pull origin master
 cd ../../
 
+# Add EasyTier
+git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytier
+
 # Add Nikki
 git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
 
