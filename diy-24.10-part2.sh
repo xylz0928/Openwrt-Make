@@ -322,6 +322,9 @@ cd ../../
 # Add Nikki
 # git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
 
+# Add EasyTier
+git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytier
+
 # Add luci-app-netspeedtest
 git clone https://github.com/sirpdboy/luci-app-netspeedtest package/luci-app-netspeedtest
 
