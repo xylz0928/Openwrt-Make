@@ -40,8 +40,8 @@ env:
   ftp_ip: ${{ secrets.FTP_IP }}
   TargetPath: OpenwrtImgs/mt7981/360T7_108M_24.10_6.6
   TargetPath2: OpenwrtImgs/mt7981/RAX3000M_NAND_6.6
-  upload_file_1: immortalwrt-mediatek-filogic-qihoo_360t7-initramfs-kernel.bin
-  upload_file_2: immortalwrt-mediatek-filogic-qihoo_360t7-squashfs-sysupgrade.bin
+  upload_file_1: immortalwrt-mediatek-filogic-qihoo_360t7_108M-initramfs-kernel.bin
+  upload_file_2: immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin
   upload_file_3: immortalwrt-mediatek-filogic-cmcc_rax3000m-initramfs-recovery.itb
   upload_file_4: immortalwrt-mediatek-filogic-cmcc_rax3000m-squashfs-sysupgrade.itb
   upload_file_5: sha256sums
