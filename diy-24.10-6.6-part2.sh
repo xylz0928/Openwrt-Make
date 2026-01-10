@@ -76,20 +76,24 @@ echo "    ▞  ▚   ▚   ▚    █ █    █      █   █  █████
 echo "  ▞▞▞  ▚▚▚ ▚▚▚ ▚▚▚ ▟  ██████      █████        ██     " >> /tmp/mark
 echo "                                               ██     " >> /tmp/mark
 echo " -----------------------------------------------------" >> /tmp/mark
-echo " .___                               __         .__    " >> /tmp/mark
-echo " |   | _____   _____   ____________/  |______  |  |   " >> /tmp/mark
-echo " |   |/     \ /     \ /  _ \_  __ \   __\__  \ |  |   " >> /tmp/mark
-echo " |   |  Y Y  \  Y Y  (  <_> )  | \/|  |  / __ \|  |__ " >> /tmp/mark
-echo " |___|__|_|  /__|_|  /\____/|__|   |__| (____  /____/ " >> /tmp/mark
-echo "           \/      \/  BE FREE AND UNAFRAID  \/       " >> /tmp/mark
+echo "     ▪  • ▌ ▄ ·. • ▌ ▄ ·.       ▄▄▄  ▄▄▄▄▄ ▄▄▄· ▄▄▌   " >> /tmp/mark
+echo "     ██ ·██ ▐███▪·██ ▐███▪▪     ▀▄ █·•██  ▐█ ▀█ ██•   " >> /tmp/mark
+echo "     ▐█·▐█ ▌▐▌▐█·▐█ ▌▐▌▐█· ▄█▀▄ ▐▀▀▄  ▐█.▪▄█▀▀█ ██▪   " >> /tmp/mark
+echo "     ▐█▌██ ██▌▐█▌██ ██▌▐█▌▐█▌.▐▌▐█•█▌ ▐█▌·▐█ ▪▐▌▐█▌▐▌ " >> /tmp/mark
+echo "     ▀▀▀▀▀  █▪▀▀▀▀▀  █▪▀▀▀ ▀█▄▀▪.▀  ▀ ▀▀▀  ▀  ▀ .▀▀▀  " >> /tmp/mark
+echo "              ImmortalWrt-798x-24.10 from PadavanOnly " >> /tmp/mark
 echo " -----------------------------------------------------" >> /tmp/mark
 echo "  %D %V, %C                                           " >> /tmp/mark
 echo "  timestamp                                           " >> /tmp/mark
 echo " -----------------------------------------------------" >> /tmp/mark
 
 
+
 # sed -i '1,5d' ./package/base-files/files/etc/banner
 # sed -i '1r /tmp/mark' ./package/base-files/files/etc/banner
+
+> ./files/etc/banner
+cat /tmp/mark >> ./files/etc/banner
 
 > ./package/base-files/files/etc/banner
 cat /tmp/mark >> ./package/base-files/files/etc/banner
