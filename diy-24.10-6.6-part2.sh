@@ -83,7 +83,7 @@ echo "     ▐█▌██ ██▌▐█▌██ ██▌▐█▌▐█▌.
 echo "     ▀▀▀▀▀  █▪▀▀▀▀▀  █▪▀▀▀ ▀█▄▀▪.▀  ▀ ▀▀▀  ▀  ▀ .▀▀▀  " >> /tmp/mark
 echo "              ImmortalWrt-798x-24.10 from PadavanOnly " >> /tmp/mark
 echo " -----------------------------------------------------" >> /tmp/mark
-echo "  %D %V, %C                                           " >> /tmp/mark
+# echo "  %D %V, %C                                           " >> /tmp/mark
 echo "  timestamp                                           " >> /tmp/mark
 echo " -----------------------------------------------------" >> /tmp/mark
 
@@ -100,6 +100,7 @@ cat /tmp/mark >> ./package/base-files/files/etc/banner
 
 # 修改版本号-tty
 sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by Zed-7nian/g" ./package/base-files/files/etc/banner
+sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by Zed-7nian/g" ./files/etc/banner
 # echo ' Built on '$(TZ=UTC-8 date +%Y-%m-%d)' by Zed-7nian' >> ./package/base-files/files/etc/banner
 # echo ' -----------------------------------------------------' >> ./package/base-files/files/etc/banner
 
