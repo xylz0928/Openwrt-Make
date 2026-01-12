@@ -1779,6 +1779,7 @@ define Device/qihoo_360t7_108M
   PAGESIZE := 2048
   IMAGE_SIZE := 110592k
   KERNEL_IN_UBI := 1
+  SUPPORTED_DEVICES := qihoo,360t7,108M
   IMAGES += factory.bin
   IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
