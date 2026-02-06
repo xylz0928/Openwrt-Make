@@ -95,16 +95,16 @@ jobs:
         npm_clean: "True"
         os_swap: "True"
 
-    - name: Freeing up disk space
-      uses: easimon/maximize-build-space@master
+#    - name: Freeing up disk space
+#      uses: easimon/maximize-build-space@master
       with: 
-        root-reserve-mb: 3072
-        swap-size-mb: 1
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+#        root-reserve-mb: 3072
+#        swap-size-mb: 1
+#        remove-dotnet: 'true'
+#        remove-android: 'true'
+#        remove-haskell: 'true'
+#        remove-codeql: 'true'
+#        remove-docker-images: 'true'
 
     - name: Free up disk space complete
       run: |
