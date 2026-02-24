@@ -263,7 +263,7 @@ git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-
 # rm -rf ./package/openwrt-passwall/v2ray-plugin
 # rm -rf ./feeds/helloworld/naiveproxy
 # rm -rf ./feeds/helloworld/tcping
-# rm -rf ./feeds/helloworld/xray-core
+rm -rf ./feeds/helloworld/xray-plugin
 
 
 # Add ADGuardHome
