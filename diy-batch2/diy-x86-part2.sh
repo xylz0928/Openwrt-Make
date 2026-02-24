@@ -201,71 +201,6 @@ rm -rf ./feeds/luci/applications/luci-app-pushbot
 # Add PushBot
 git clone https://github.com/zzsj0928/luci-app-pushbot package/luci-app-pushbot
 
-
-# Add Hello World VSSR
-# svn co https://github.com/jerrykuku/luci-app-vssr/trunk/  package/diy/luci-app-vssr
-# svn co https://github.com/siropboy/luci-app-vssr-plus/trunk/luci-app-vssr-plus package/new/luci-app-vssr-plus
-# svn co https://github.com/ysx88/openwrt-packages/trunk/luci-app-vssr package/luci-app-vssr
-git clone https://github.com/OpenWrt-Actions/luci-app-vssr.git package/luci-app-vssr
-
-# Add Hello World SSR Plus+
-git clone -b master https://github.com/fw876/helloworld.git package/helloworld
-# rm -rf ./package/helloworld/shadowsocksr-libev
-
-# mkdir package/tmp_helloworld
-# mkdir package/tmp_helloworld/shadowsocksr-libev
-# cd package/tmp_helloworld/shadowsocksr-libev
-# git init
-# git remote add -f origin https://github.com/sbwml/openwrt_helloworld
-# git config core.sparseCheckout true
-# echo "shadowsocksr-libev" >> .git/info/sparse-checkout
-# git pull origin v5
-# cd ../../../
-# mv ./package/tmp_helloworld/shadowsocksr-libev/shadowsocksr-libev ./package/helloworld/shadowsocksr-libev
-# rm -rf ./package/tmp_helloworld
-
-# git lua-maxminddb 依赖
-git clone https://github.com/jerrykuku/lua-maxminddb.git package/lean/lua-maxminddb
-
-# git clone https://github.com/jerrykuku/luci-app-vssr.git package/lean/luci-app-vssr
-
-# Add Passwall
-# Dependencies
-rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
-git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages package/passwall-packages
-# git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
-
-#Passwall
-rm -rf feeds/luci/applications/luci-app-passwall
-git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
-# git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
-# Passwall2
-# git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
-# svn co https://github.com/xiaorouji/openwrt-passwall2/trunk/luci-app-passwall2 ./package/luci-app-passwall2
-# chmod -R 755 ./package/luci-app-passwall2/*
-# rm -rf ./package/openwrt-passwall/v2ray-*
-# rm -rf ./package/openwrt-passwall/xray-*
-# https://github.com/xiaorouji/openwrt-passwall/tree/luci/luci-app-passwall
-# rm -rf ./package/lean/dns2socks
-# rm -rf ./package/lean/ipt2socks
-# rm -rf ./package/lean/kcptun
-# rm -rf ./package/lean/microsocks
-# rm -rf ./package/lean/shadowsocksr-libev
-# rm -rf ./package/lean/simple-obfs
-# rm -rf ./package/lean/tcping
-# rm -rf ./package/lean/trojan
-# rm -rf ./package/lean/v2ray
-# rm -rf ./package/lean/v2ray-plugin
-# rm -rf ./package/openwrt-passwall/naiveproxy
-# rm -rf ./package/openwrt-passwall/tcping
-# rm -rf ./package/openwrt-passwall/xray-core
-# rm -rf ./package/openwrt-passwall/v2ray
-# rm -rf ./package/openwrt-passwall/v2ray-plugin
-# rm -rf ./feeds/helloworld/naiveproxy
-# rm -rf ./feeds/helloworld/tcping
-rm -rf ./feeds/helloworld/xray-plugin
-rm -rf ./package/helloworld/xray-plugin
-
 # Add ADGuardHome
 git clone https://github.com/xiaoxiao29/luci-app-adguardhome package/luci-app-adguardhome
 # git clone https://github.com/rufengsuixing/luci-app-adguardhome package/luci-app-adguardhome
@@ -310,8 +245,7 @@ cd ../../
 # svn co https://github.com/sirpdboy/sirpdboy-package/trunk/luci-app-koolproxyR ./package/luci-app-koolproxyR
 # chmod -R 755 ./package/luci-app-koolproxyR/*
 
-# Add GodProxy
-git clone https://github.com/godros/luci-app-godproxy.git package/luci-app-godproxy
+
 
 # Add luci-app-socat
 # svn co https://github.com/Lienol/openwrt-package/trunk/luci-app-socat ./package/luci-app-socat
@@ -359,25 +293,12 @@ git clone https://github.com/esirplayground/luci-app-poweroff package/luci-app-p
 # chmod -R 755 ./feeds/luci/modules/luci-mod-admin-full/luasrc/controller/admin/system.lua
 # chmod -R 755 ./feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_system/poweroff.htm
 
-# Add ByPass
-# svn co https://github.com/kiddin9/openwrt-packages/trunk/luci-app-bypass ./package/luci-app-bypass
-# chmod -R 755 ./package/luci-app-bypass/*
 
-mkdir package/luci-app-bypass
-cd package/luci-app-bypass
-git init
-git remote add -f origin https://github.com/haiibo/openwrt-packages
-# git remote add -f origin https://github.com/kiddin9/openwrt-packages
-git config core.sparseCheckout true
-echo "luci-app-bypass" >> .git/info/sparse-checkout
-git pull origin master
-cd ../../
 
 # Add EasyTier
 git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytier
 
-# Add Nikki
-git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
+
 
 # Add OpenClash
 # git clone -b master https://github.com/vernesong/OpenClash.git package/OpenClash
@@ -393,6 +314,96 @@ git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-
 # echo "luci-app-openclash" >> .git/info/sparse-checkout
 # git pull origin master
 # cd ../../
+
+# Add Passwall
+# Dependencies
+rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
+git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages package/passwall-packages
+git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
+# Passwall
+rm -rf feeds/luci/applications/luci-app-passwall
+git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
+# git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
+
+#----------------------------------------------#
+#----------------------------------------------#
+#----------------------------------------------#
+### Old Apps
+#----------------------------------------------#
+## Add GodProxy
+# git clone https://github.com/godros/luci-app-godproxy.git package/luci-app-godproxy
+#----------------------------------------------#
+#----------------------------------------------#
+#----------------------------------------------#
+### Old Proxy
+#----------------------------------------------#
+## Add Nikki
+# git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
+#----------------------------------------------#
+## Add ByPass
+## svn co https://github.com/kiddin9/openwrt-packages/trunk/luci-app-bypass ./package/luci-app-bypass
+## chmod -R 755 ./package/luci-app-bypass/*
+# mkdir package/luci-app-bypass
+# cd package/luci-app-bypass
+# git init
+# git remote add -f origin https://github.com/haiibo/openwrt-packages
+## git remote add -f origin https://github.com/kiddin9/openwrt-packages
+# git config core.sparseCheckout true
+# echo "luci-app-bypass" >> .git/info/sparse-checkout
+# git pull origin master
+# cd ../../
+#----------------------------------------------#
+## Passwall2
+## git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
+## svn co https://github.com/xiaorouji/openwrt-passwall2/trunk/luci-app-passwall2 ./package/luci-app-passwall2
+## chmod -R 755 ./package/luci-app-passwall2/*
+## rm -rf ./package/openwrt-passwall/v2ray-*
+## rm -rf ./package/openwrt-passwall/xray-*
+## https://github.com/xiaorouji/openwrt-passwall/tree/luci/luci-app-passwall
+## rm -rf ./package/lean/dns2socks
+## rm -rf ./package/lean/ipt2socks
+## rm -rf ./package/lean/kcptun
+## rm -rf ./package/lean/microsocks
+## rm -rf ./package/lean/shadowsocksr-libev
+## rm -rf ./package/lean/simple-obfs
+## rm -rf ./package/lean/tcping
+## rm -rf ./package/lean/trojan
+## rm -rf ./package/lean/v2ray
+## rm -rf ./package/lean/v2ray-plugin
+## rm -rf ./package/openwrt-passwall/naiveproxy
+## rm -rf ./package/openwrt-passwall/tcping
+## rm -rf ./package/openwrt-passwall/xray-core
+## rm -rf ./package/openwrt-passwall/v2ray
+## rm -rf ./package/openwrt-passwall/v2ray-plugin
+## rm -rf ./feeds/helloworld/naiveproxy
+## rm -rf ./feeds/helloworld/tcping
+# rm -rf ./feeds/helloworld/xray-plugin
+# rm -rf ./package/helloworld/xray-plugin
+#----------------------------------------------#
+## Add Hello World VSSR
+## svn co https://github.com/jerrykuku/luci-app-vssr/trunk/  package/diy/luci-app-vssr
+## svn co https://github.com/siropboy/luci-app-vssr-plus/trunk/luci-app-vssr-plus package/new/luci-app-vssr-plus
+## svn co https://github.com/ysx88/openwrt-packages/trunk/luci-app-vssr package/luci-app-vssr
+## git clone https://github.com/jerrykuku/luci-app-vssr.git package/lean/luci-app-vssr
+# git clone https://github.com/OpenWrt-Actions/luci-app-vssr.git package/luci-app-vssr
+#----------------------------------------------#
+## Add Hello World SSR Plus+
+# git clone -b master https://github.com/fw876/helloworld.git package/helloworld
+## rm -rf ./package/helloworld/shadowsocksr-libev
+## mkdir package/tmp_helloworld
+## mkdir package/tmp_helloworld/shadowsocksr-libev
+## cd package/tmp_helloworld/shadowsocksr-libev
+## git init
+## git remote add -f origin https://github.com/sbwml/openwrt_helloworld
+## git config core.sparseCheckout true
+## echo "shadowsocksr-libev" >> .git/info/sparse-checkout
+## git pull origin v5
+## cd ../../../
+## mv ./package/tmp_helloworld/shadowsocksr-libev/shadowsocksr-libev ./package/helloworld/shadowsocksr-libev
+## rm -rf ./package/tmp_helloworld
+## git lua-maxminddb 依赖
+# git clone https://github.com/jerrykuku/lua-maxminddb.git package/lean/lua-maxminddb
+
 
 # Fix Multi-use on one physical port 
 # 修复 5.4.68-5.4.69内核 于 MIPS 架构 单线复用BUG
