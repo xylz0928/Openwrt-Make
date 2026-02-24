@@ -383,16 +383,16 @@ git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-ni
 # git clone -b master https://github.com/vernesong/OpenClash.git package/OpenClash
 # svn co https://github.com/vernesong/OpenClash/trunk/luci-app-openclash ./package/luci-app-openclash
 # chmod -R 755 ./package/luci-app-openclash/*
-
-mkdir package/luci-app-openclash
-cd package/luci-app-openclash
-git clone --depth=1 https://github.com/vernesong/OpenClash.git
+git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-openclash
+# mkdir package/luci-app-openclash
+# cd package/luci-app-openclash
+# git clone --depth=1 https://github.com/vernesong/OpenClash.git
 # git init
 # git remote add -f origin https://github.com/vernesong/OpenClash
 # git config core.sparseCheckout true
 # echo "luci-app-openclash" >> .git/info/sparse-checkout
 # git pull origin master
-cd ../../
+# cd ../../
 
 # Fix Multi-use on one physical port 
 # 修复 5.4.68-5.4.69内核 于 MIPS 架构 单线复用BUG
