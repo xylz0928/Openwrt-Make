@@ -232,10 +232,14 @@ git clone https://github.com/jerrykuku/lua-maxminddb.git package/lean/lua-maxmin
 # Add Passwall
 # Dependencies
 git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
+rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
+# git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages package/passwall-packages
 #Passwall
-git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
-#Passwall2
-git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
+rm -rf feeds/luci/applications/luci-app-passwall
+git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
+# git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
+# Passwall2
+# git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
 # svn co https://github.com/xiaorouji/openwrt-passwall2/trunk/luci-app-passwall2 ./package/luci-app-passwall2
 # chmod -R 755 ./package/luci-app-passwall2/*
 # rm -rf ./package/openwrt-passwall/v2ray-*
