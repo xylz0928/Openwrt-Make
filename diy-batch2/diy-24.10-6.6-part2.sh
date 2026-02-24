@@ -176,14 +176,15 @@ git clone https://github.com/brvphoenix/wrtbwmon package/wrtbwmon
 # svn co https://github.com/jerrykuku/luci-app-vssr/trunk/  package/diy/luci-app-vssr
 # svn co https://github.com/siropboy/luci-app-vssr-plus/trunk/luci-app-vssr-plus package/new/luci-app-vssr-plus
 # svn co https://github.com/ysx88/openwrt-packages/trunk/luci-app-vssr package/luci-app-vssr
-git clone https://github.com/OpenWrt-Actions/luci-app-vssr.git package/luci-app-vssr
-git clone https://github.com/op4packages/pdnsd-alt package/pdnsd-alt
+
+# git clone https://github.com/OpenWrt-Actions/luci-app-vssr.git package/luci-app-vssr
+# git clone https://github.com/op4packages/pdnsd-alt package/pdnsd-alt
 
 # Add Hello World SSR Plus+
-git clone -b main https://github.com/fw876/helloworld.git package/helloworld
+# git clone -b main https://github.com/fw876/helloworld.git package/helloworld
 
 # git lua-maxminddb 依赖
-git clone https://github.com/jerrykuku/lua-maxminddb.git package/lean/lua-maxminddb
+# git clone https://github.com/jerrykuku/lua-maxminddb.git package/lean/lua-maxminddb
 
 # git clone https://github.com/jerrykuku/luci-app-vssr.git package/lean/luci-app-vssr
 
@@ -316,18 +317,18 @@ git clone https://github.com/sirpdboy/luci-app-lucky package/luci-app-lucky
 # chmod -R 755 ./feeds/luci/modules/luci-mod-admin-full/luasrc/controller/admin/system.lua
 # chmod -R 755 ./feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_system/poweroff.htm
 
-# Add ByPass
-# svn co https://github.com/kiddin9/openwrt-packages/trunk/luci-app-bypass ./package/luci-app-bypass
-# chmod -R 755 ./package/luci-app-bypass/*
-mkdir package/luci-app-bypass
-cd package/luci-app-bypass
-git init
-git remote add -f origin https://github.com/haiibo/openwrt-packages
-# git remote add -f origin https://github.com/kiddin9/openwrt-packages
-git config core.sparseCheckout true
-echo "luci-app-bypass" >> .git/info/sparse-checkout
-git pull origin master
-cd ../../
+## Add ByPass
+## svn co https://github.com/kiddin9/openwrt-packages/trunk/luci-app-bypass ./package/luci-app-bypass
+## chmod -R 755 ./package/luci-app-bypass/*
+# mkdir package/luci-app-bypass
+# cd package/luci-app-bypass
+# git init
+# git remote add -f origin https://github.com/haiibo/openwrt-packages
+## git remote add -f origin https://github.com/kiddin9/openwrt-packages
+# git config core.sparseCheckout true
+# echo "luci-app-bypass" >> .git/info/sparse-checkout
+# git pull origin master
+# cd ../../
 
 # Add Nikki
 # git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
