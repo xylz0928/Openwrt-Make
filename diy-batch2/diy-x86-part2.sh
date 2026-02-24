@@ -264,7 +264,7 @@ git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-
 # rm -rf ./feeds/helloworld/naiveproxy
 # rm -rf ./feeds/helloworld/tcping
 rm -rf ./feeds/helloworld/xray-plugin
-
+rm -rf ./package/helloworld/xray-plugin
 
 # Add ADGuardHome
 git clone https://github.com/xiaoxiao29/luci-app-adguardhome package/luci-app-adguardhome
