@@ -223,7 +223,7 @@ git clone https://github.com/brvphoenix/wrtbwmon package/wrtbwmon
 ## rm -rf ./feeds/helloworld/naiveproxy
 ## rm -rf ./feeds/helloworld/tcping
 ## rm -rf ./feeds/helloworld/xray-core
-rm -rf ./package/feeds/packages/rust
+rm -rf ./package/feeds/packages/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Add ADGuardHome
 # git clone https://github.com/rufengsuixing/luci-app-adguardhome package/luci-app-adguardhome
