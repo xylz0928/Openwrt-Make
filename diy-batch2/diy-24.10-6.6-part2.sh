@@ -188,41 +188,41 @@ git clone https://github.com/brvphoenix/wrtbwmon package/wrtbwmon
 
 # git clone https://github.com/jerrykuku/luci-app-vssr.git package/lean/luci-app-vssr
 
-# Add Passwall
-# Dependencies
-rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
-git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages package/passwall-packages
-# git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
+## Add Passwall
+## Dependencies
+# rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
+# git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages package/passwall-packages
+## git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
 
-#Passwall
-rm -rf feeds/luci/applications/luci-app-passwall
-git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
-# git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
-# Passwall2
-# git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
-# svn co https://github.com/xiaorouji/openwrt-passwall2/trunk/luci-app-passwall2 ./package/luci-app-passwall2
-# chmod -R 755 ./package/luci-app-passwall2/*
-# rm -rf ./package/openwrt-passwall/v2ray-*
-# rm -rf ./package/openwrt-passwall/xray-*
-# https://github.com/xiaorouji/openwrt-passwall/tree/luci/luci-app-passwall
-# rm -rf ./package/lean/dns2socks
-# rm -rf ./package/lean/ipt2socks
-# rm -rf ./package/lean/kcptun
-# rm -rf ./package/lean/microsocks
-# rm -rf ./package/lean/shadowsocksr-libev
-# rm -rf ./package/lean/simple-obfs
-# rm -rf ./package/lean/tcping
-# rm -rf ./package/lean/trojan
-# rm -rf ./package/lean/v2ray
-# rm -rf ./package/lean/v2ray-plugin
-# rm -rf ./package/openwrt-passwall/naiveproxy
-# rm -rf ./package/openwrt-passwall/tcping
-# rm -rf ./package/openwrt-passwall/xray-core
-# rm -rf ./package/openwrt-passwall/v2ray
-# rm -rf ./package/openwrt-passwall/v2ray-plugin
-# rm -rf ./feeds/helloworld/naiveproxy
-# rm -rf ./feeds/helloworld/tcping
-# rm -rf ./feeds/helloworld/xray-core
+## Passwall
+# rm -rf feeds/luci/applications/luci-app-passwall
+# git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
+## git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
+## Passwall2
+## git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
+## svn co https://github.com/xiaorouji/openwrt-passwall2/trunk/luci-app-passwall2 ./package/luci-app-passwall2
+## chmod -R 755 ./package/luci-app-passwall2/*
+## rm -rf ./package/openwrt-passwall/v2ray-*
+## rm -rf ./package/openwrt-passwall/xray-*
+## https://github.com/xiaorouji/openwrt-passwall/tree/luci/luci-app-passwall
+## rm -rf ./package/lean/dns2socks
+## rm -rf ./package/lean/ipt2socks
+## rm -rf ./package/lean/kcptun
+## rm -rf ./package/lean/microsocks
+## rm -rf ./package/lean/shadowsocksr-libev
+## rm -rf ./package/lean/simple-obfs
+## rm -rf ./package/lean/tcping
+## rm -rf ./package/lean/trojan
+## rm -rf ./package/lean/v2ray
+## rm -rf ./package/lean/v2ray-plugin
+## rm -rf ./package/openwrt-passwall/naiveproxy
+## rm -rf ./package/openwrt-passwall/tcping
+## rm -rf ./package/openwrt-passwall/xray-core
+## rm -rf ./package/openwrt-passwall/v2ray
+## rm -rf ./package/openwrt-passwall/v2ray-plugin
+## rm -rf ./feeds/helloworld/naiveproxy
+## rm -rf ./feeds/helloworld/tcping
+## rm -rf ./feeds/helloworld/xray-core
 
 
 # Add ADGuardHome
