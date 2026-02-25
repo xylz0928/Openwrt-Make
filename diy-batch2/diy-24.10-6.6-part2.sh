@@ -223,7 +223,7 @@ git clone https://github.com/brvphoenix/wrtbwmon package/wrtbwmon
 ## rm -rf ./feeds/helloworld/naiveproxy
 ## rm -rf ./feeds/helloworld/tcping
 ## rm -rf ./feeds/helloworld/xray-core
-
+rm -rf ./package/feeds/packages/rust
 
 # Add ADGuardHome
 # git clone https://github.com/rufengsuixing/luci-app-adguardhome package/luci-app-adguardhome
