@@ -336,8 +336,8 @@ git clone https://github.com/sirpdboy/luci-app-lucky package/luci-app-lucky
 # Add EasyTier
 git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytier
 
-# Add luci-app-netspeedtest
-git clone https://github.com/sirpdboy/luci-app-netspeedtest package/luci-app-netspeedtest
+## Add luci-app-netspeedtest
+# git clone https://github.com/sirpdboy/luci-app-netspeedtest package/luci-app-netspeedtest
 
 # Add 360 T7 108M
 wget -O "target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts" "https://github.com/zonghewang/Action-237-immortalwrt-mt798x-24.10/raw/refs/heads/main/target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts"
