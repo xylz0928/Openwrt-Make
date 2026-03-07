@@ -195,8 +195,8 @@ git clone https://github.com/Openwrt-Passwall/openwrt-passwall-packages package/
 ## git clone https://github.com/xiaorouji/openwrt-passwall-packages package/openwrt-passwall-packages
 
 ## Passwall
-rm -rf feeds/luci/applications/luci-app-passwall
-git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
+# rm -rf feeds/luci/applications/luci-app-passwall
+# git clone https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
 ## git clone https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
 ## Passwall2
 ## git clone https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
