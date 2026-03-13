@@ -276,7 +276,7 @@ git clone https://github.com/chenmozhijin/luci-app-socat package/luci-app-socat
 git clone https://github.com/sirpdboy/luci-app-advanced package/luci-app-advanced
 
 # Add luci-app-netspeedtest
-git clone https://github.com/sirpdboy/luci-app-netspeedtest package/luci-app-netspeedtest
+git clone https://github.com/sirpdboy/netspeedtest package/netspeedtest
 
 # Add SmartDNS
 # rm -rf ./feeds/packages/net/smartdns
