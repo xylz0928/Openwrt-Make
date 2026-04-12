@@ -1,0 +1,350 @@
+#
+# Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+#
+
+name: Build OpenWrt-mt7981-24.10-6.6-withClash
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+  schedule:
+    - cron: 0 14 * * 0
+
+env:
+  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
+  REPO_BRANCH: openwrt-24.10-6.6
+  FEEDS_CONF: feeds.conf.default
+  model: 360T7_6.6
+  model2: cmcc_rax3000m_6.6
+  CONFIG_FILE: config/MakeMenu.mt7981.24.10.6.6.withClash.config
+  DIY_P1_SH: diy-batch1/diy-x86-part1.sh
+  DIY_P2_SH: diy-batch2/diy-24.10-6.6-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+  UPLOAD_ZZNAS: true
+  ftp_username: ${{ secrets.FTP_USERNAME }}
+  ftp_psw: ${{ secrets.FTP_PSW }}
+  ftp_ip: ${{ secrets.FTP_IP }}
+  TargetPath: OpenwrtImgs/mt7981/360T7_108M_24.10_6.6
+  TargetPath2: OpenwrtImgs/mt7981/RAX3000M_NAND_6.6
+  upload_file_1: immortalwrt-mediatek-filogic-qihoo_360t7_108M-initramfs-kernel.bin
+  upload_file_2: immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin
+  upload_file_3: immortalwrt-mediatek-filogic-cmcc_rax3000m-initramfs-recovery.itb
+  upload_file_4: immortalwrt-mediatek-filogic-cmcc_rax3000m-squashfs-sysupgrade.itb
+  upload_file_5: sha256sums
+  whkey: ${{ secrets.WEBHOOK }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check Server Hardware
+      if: (!cancelled())
+      run: |
+        echo "警告⚠"
+        echo "若分配的服务器性能不足，务必及时取消，重新运行！"
+        echo "已知编译成功CPU型号：8370C,8171M"
+        echo "已知性能不足CPU型号：8272CL,E5系列"
+        echo "--------------------------CPU信息--------------------------"
+        echo "CPU物理数量:$(cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l)"
+        echo -e "CPU核心及版本信息：$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
+        echo "--------------------------内存信息--------------------------"
+        echo "已安装内存详细信息："
+        sudo lshw -short -C memory | grep GiB
+        echo -e "\n"
+        
+    - name: Before freeing up disk space
+      run: |
+        echo "Before freeing up disk space"
+        echo "=============================================================================="
+        df -hT
+        echo "=============================================================================="
+
+    - name: "Optimize Disk Space"
+      uses: "hugoalh/disk-space-optimizer-ghaction@v0.8.1"
+      with:
+        operate_sudo: "True"
+        general_include: ".+"
+        general_exclude: |-
+          ^GCC$
+          ^G\+\+$
+          Clang
+          LLVM
+        docker_include: ".+"
+        docker_prune: "True"
+        docker_clean: "True"
+        apt_prune: "True"
+        apt_clean: "True"
+        homebrew_prune: "True"
+        homebrew_clean: "True"
+        npm_prune: "True"
+        npm_clean: "True"
+        os_swap: "True"
+
+#    - name: Freeing up disk space
+#      uses: easimon/maximize-build-space@master
+#      with: 
+#        root-reserve-mb: 3072
+#        swap-size-mb: 1
+#        remove-dotnet: 'true'
+#        remove-android: 'true'
+#        remove-haskell: 'true'
+#        remove-codeql: 'true'
+#        remove-docker-images: 'true'
+
+    - name: Free up disk space complete
+      run: |
+        echo "Free up disk space complete"
+        echo "=============================================================================="
+        df -hT
+        echo "=============================================================================="
+        
+    - name: Checkout
+      uses: actions/checkout@main
+      
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+        bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+        git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+        libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
+        mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools \
+        libpython3-dev qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
+        vim wget xmlto xxd zlib1g-dev python3-setuptools uwsgi uwsgi-plugin-python3 python3-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo chown $USER:$GROUPS $GITHUB_WORKSPACE
+
+    - name: Switch GCC/GXX Version
+      uses: xylz0928/SwitchUbuntuGccGxxVersion@v1.0.7
+      with:
+        TargetVer: '12'
+        
+
+    - name: Clone source code
+      working-directory: ./
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf ./openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Load custom feeds
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: Update feeds
+      run: cd openwrt && ./scripts/feeds update -a
+
+    - name: Install feeds
+      run: cd openwrt && ./scripts/feeds install -a
+
+    - name: Load custom configuration
+      run: |
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: SSH connection to Actions
+      uses: P3TERX/ssh2actions@v1.0.0
+      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
+      env:
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+    - name: Download package
+      id: package
+      run: |
+        cd openwrt
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: Compile the firmware
+      id: compile
+      run: |
+        send_dingding="curl -s \"https://oapi.dingtalk.com/robot/send?access_token=${whkey}\" -H 'Content-Type: application/json' -d '{\"msgtype\": \"markdown\",\"markdown\": {\"title\":"
+        send_content0="【${model}】正在启动编译！请稍后大约4小时..."
+        markdown_splitline="\n\n---\n\n"
+        GITHUB_WORKFLOW_URL=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+        nowtime=`date "+%Y-%m-%d %H:%M:%S"`
+        eval "$send_dingding \"${send_content0}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#6A65FF>${send_content0}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
+        
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+        sed -n -r '/^CONFIG_TARGET.*DEVICE.*=y/{s/.*DEVICE_([^_]+_[^_]+)_.*=y/\1/p;q}' .config > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+    - name: Check space usage
+      if: (!cancelled())
+      run: df -hT
+
+    - name: Upload bin directory
+      uses: actions/upload-artifact@main
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/bin
+
+    - name: Organize files
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware directory
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
+
+    - name: Upload firmware to my NAS
+      id: zz-nas
+      if: steps.organize.outputs.status == 'success' && env.UPLOAD_ZZNAS == 'true' && !cancelled()
+      run: |
+        send_dingding="curl -s \"https://oapi.dingtalk.com/robot/send?access_token=${whkey}\" -H 'Content-Type: application/json' -d '{\"msgtype\": \"markdown\",\"markdown\": {\"title\":"
+        send_content1="【${model}】【${model2}】编译成功！正在上传固件到NAS..."
+        send_content2="【${model}】【${model2}】编译成功！固件成功上传到NAS。"
+        markdown_splitline="\n\n---\n\n"
+        GITHUB_WORKFLOW_URL=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+        nowtime=`date "+%Y-%m-%d %H:%M:%S"`
+        eval "$send_dingding \"${send_content1}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#6A65FF>${send_content1}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
+        
+        cd openwrt/bin/targets/*/*
+        echo $ftp_psw > /tmp/rsync.psw && chmod 600 /tmp/rsync.psw
+
+        transfer_with_retry() {
+          local file="$1"
+          local target="$2"
+          local retries=3
+          local attempt=1
+              
+          if [[ -z "$file" ]]; then
+            echo "⚠️  Skipping empty file parameter"
+            return 0
+          fi
+              
+          if ! ls $file >/dev/null 2>&1; then
+            echo "⚠️  File(s) matching '$file' not found, skipping"
+            return 0
+          fi
+              
+          while true; do
+            echo "🚀 Attempt $attempt: Transferring $file to $target"
+            if rsync -avzP --partial "$file" "$target" --password-file=/tmp/rsync.psw; then
+              echo "✅ Successfully transferred $file"
+              return 0
+            fi
+                  
+            if [[ $attempt -ge $retries ]]; then
+              echo "❌ Critical failure: $file failed after $retries attempts"
+              return 1
+            fi
+                  
+            echo "⚠️  Failed attempt $attempt for $file. Retrying in 5 seconds..."
+            sleep 5
+            ((attempt++))
+          done
+        }
+          
+        transfer_group() {
+          local target="$1"
+          shift
+          local files=("$@")
+          local error_occurred=0
+              
+          echo "===================== Transferring to $target ====================="
+              
+          for file in "${files[@]}"; do
+            if ! transfer_with_retry "$file" "$target"; then
+              error_occurred=1
+              echo "❌ File $file failed, skipping but continuing with others"
+            fi
+          done
+              
+          return $error_occurred
+        }
+          
+        timestamp=$(date +"%Y.%m.%d-%H%M")
+        target1="$ftp_username@$ftp_ip::$TargetPath/$timestamp/"
+        target2="$ftp_username@$ftp_ip::$TargetPath2/$timestamp/"
+          
+        group1=("$upload_file_1" "$upload_file_2" "$upload_file_5")
+        group2=("$upload_file_3" "$upload_file_4" "$upload_file_5")
+          
+        transfer_group "$target1" "${group1[@]}" || {
+          echo "⚠️  One or more files in group 1 failed"
+        }
+          
+        transfer_group "$target2" "${group2[@]}" || {
+          echo "⚠️  One or more files in group 2 failed"
+        }
+          
+        rm -f /tmp/rsync.psw
+        echo "===================== Transfer Completed ====================="
+        nowtime=`date "+%Y-%m-%d %H:%M:%S"`
+        eval "$send_dingding \"${send_content2}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#92D050>${send_content2}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
+        echo "::warning file=zz-nas.com::All Released Files Uploaded to ZZ-NAS"
+
+    - name: Generate release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "release_tag=$model-and-$model2-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
+
+    - name: Delete workflow runs
+      uses: GitRML/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 3
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@v0.1.0
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      with:
+        keep_latest: 9
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
