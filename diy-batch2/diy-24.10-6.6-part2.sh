@@ -344,13 +344,21 @@ wget -O "target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts" "https://github
 wget -O "target/linux/mediatek/image/filogic.mk" "https://github.com/zonghewang/Action-237-immortalwrt-mt798x-24.10/raw/refs/heads/main/target/linux/mediatek/image/filogic.mk"
 
 sed -i 's/  DEVICE_DTS := mt7981b-qihoo-360t7-108M/  DEVICE_DTS := mt7981b-qihoo-360t7-108M\n  SUPPORTED_DEVICES := qihoo,360t7,108M/' target/linux/mediatek/image/filogic.mk
+
+# Add Zerotier
+rm -rf feeds/luci/applications/luci-app-zerotier
+git clone --depth=1 https://github.com/mwarning/zerotier-openwrt.git package/luci-app-zerotier
+
+
 # Add OpenClash
 # git clone -b master https://github.com/vernesong/OpenClash.git package/OpenClash
 # svn co https://github.com/vernesong/OpenClash/trunk/luci-app-openclash ./package/luci-app-openclash
 # chmod -R 755 ./package/luci-app-openclash/*
-
+rm -rf feeds/luci/applications/luci-app-openclash
+git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 # mkdir package/luci-app-openclash
 # cd package/luci-app-openclash
+# git clone --depth=1 https://github.com/vernesong/OpenClash.git
 # git init
 # git remote add -f origin https://github.com/vernesong/OpenClash
 # git config core.sparseCheckout true
