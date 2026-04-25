@@ -304,6 +304,7 @@ git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytie
 # git clone -b master https://github.com/vernesong/OpenClash.git package/OpenClash
 # svn co https://github.com/vernesong/OpenClash/trunk/luci-app-openclash ./package/luci-app-openclash
 # chmod -R 755 ./package/luci-app-openclash/*
+rm -rf feeds/luci/applications/luci-app-openclash
 git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 # mkdir package/luci-app-openclash
 # cd package/luci-app-openclash
