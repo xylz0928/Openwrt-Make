@@ -146,7 +146,8 @@ git init
 git remote add -f origin https://github.com/xylz0928/luci-mod
 git config core.sparseCheckout true
 echo "feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons" >> .git/info/sparse-checkout
-git pull origin main
+# git pull origin main
+git pull origin immortalwrt-24.10
 cd ../../
 
 mv package/lucimod/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons/* feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons/
