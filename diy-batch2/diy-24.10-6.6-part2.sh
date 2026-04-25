@@ -347,7 +347,7 @@ sed -i 's/  DEVICE_DTS := mt7981b-qihoo-360t7-108M/  DEVICE_DTS := mt7981b-qihoo
 
 # Add Zerotier
 rm -rf feeds/luci/applications/luci-app-zerotier
-git clone --depth=1 https://github.com/mwarning/zerotier-openwrt.git package/luci-app-zerotier
+git clone https://github.com/mwarning/zerotier-openwrt.git package/luci-app-zerotier
 
 
 # Add OpenClash
