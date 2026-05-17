@@ -340,8 +340,8 @@ git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytie
 # git clone https://github.com/sirpdboy/luci-app-netspeedtest package/luci-app-netspeedtest
 
 # Add 360 T7 108M
-wget -O "target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts" "https://github.com/zonghewang/Action-237-immortalwrt-mt798x-24.10/raw/refs/heads/main/target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts"
-wget -O "target/linux/mediatek/image/filogic.mk" "https://github.com/zonghewang/Action-237-immortalwrt-mt798x-24.10/raw/refs/heads/main/target/linux/mediatek/image/filogic.mk"
+wget -O "target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts" "https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts"
+wget -O "target/linux/mediatek/image/filogic.mk" "https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/target/linux/mediatek/image/filogic.mk"
 
 sed -i 's/  DEVICE_DTS := mt7981b-qihoo-360t7-108M/  DEVICE_DTS := mt7981b-qihoo-360t7-108M\n  SUPPORTED_DEVICES := qihoo,360t7,108M/' target/linux/mediatek/image/filogic.mk
 
