@@ -334,6 +334,7 @@ git clone https://github.com/sirpdboy/luci-app-lucky package/luci-app-lucky
 # git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
 
 # Add EasyTier
+rm -rf feeds/packages/net/easytier
 git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytier
 
 ## Add luci-app-netspeedtest
