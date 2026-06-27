@@ -297,6 +297,7 @@ git clone https://github.com/esirplayground/luci-app-poweroff package/luci-app-p
 
 
 # Add EasyTier
+rm -rf feeds/packages/net/easytier
 git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytier
 
 
