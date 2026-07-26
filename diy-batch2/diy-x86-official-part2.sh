@@ -93,8 +93,8 @@ rm -rf feeds/luci/applications/luci-app-passwall
 git clone --depth 1 https://github.com/Openwrt-Passwall/openwrt-passwall package/passwall-luci
 
 ## Add cloudflared
-rm -rf feeds/packages/net/cloudflared
-git clone --depth 1 https://github.com/rqydhy/cloudflared-for-openwrt package/cloudflared
+# rm -rf feeds/packages/net/cloudflared
+# git clone --depth 1 https://github.com/rqydhy/cloudflared-for-openwrt package/cloudflared
 
 ## Add SmartDNS
 rm -rf feeds/packages/net/smartdns
