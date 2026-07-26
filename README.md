@@ -1,43 +1,61 @@
-# Actions-OpenWrt Active
+# Openwrt-Make - 自定义固件构建配置
 
 [![LICENSE](https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square&label=LICENSE)](https://github.com/P3TERX/Actions-OpenWrt/blob/master/LICENSE)
-![GitHub Stars](https://img.shields.io/github/stars/P3TERX/Actions-OpenWrt.svg?style=flat-square&label=Stars&logo=github)
-![GitHub Forks](https://img.shields.io/github/forks/P3TERX/Actions-OpenWrt.svg?style=flat-square&label=Forks&logo=github)
 
-Build OpenWrt using GitHub Actions
+## 项目结构
 
-[Read the details in my blog (in Chinese) | 中文教程](https://p3terx.com/archives/build-openwrt-with-github-actions.html)
+```
+├── AllinOneBatch/          # 一键编译脚本
+│   ├── AllinOne.sh            # LEDE x86_64 编译（主仓库）
+│   ├── AllinOne-official-x86.sh # Official OpenWRT x86_64 编译
+│   ├── AllinOne-798x.sh       # ImmortalWRT MT798x 编译
+│   └── ...
+├── config/                 # .config 配置文件
+│   ├── MakeMenu.x86.config        # LEDE x86_64 配置
+│   ├── MakeMenu.x86-official.config # Official x86_64 配置
+│   └── ...
+├── diy-batch1/             # 编译前 DIY 脚本 (feeds update 之前)
+│   ├── diy-x86-part1.sh           # LEDE x86_64
+│   ├── diy-x86-official-part1.sh  # Official x86_64
+│   └── ...
+├── diy-batch2/             # 编译后 DIY 脚本 (feeds update 之后)
+│   ├── diy-x86-part2.sh           # LEDE x86_64
+│   ├── diy-x86-official-part2.sh  # Official x86_64
+│   └── ...
+└── target/                 # 内核及其他资源
+```
 
-## Usage
+## 使用方式
 
-- Click the [Use this template](https://github.com/P3TERX/Actions-OpenWrt/generate) button to create a new repository.
-- Generate `.config` files using [Lean's OpenWrt](https://github.com/coolsnowwolf/lede) source code. ( You can change it through environment variables in the workflow file. )
-- Push `.config` file to the GitHub repository.
-- Select `Build OpenWrt` on the Actions page.
-- Click the `Run workflow` button.
-- When the build is complete, click the `Artifacts` button in the upper right corner of the Actions page to download the binaries.
+### 本地编译
 
-## Tips
+1. **LEDE 分支**（现有，功能最全）：
+   ```bash
+   bash AllinOneBatch/AllinOne.sh
+   ```
 
-- It may take a long time to create a `.config` file and build the OpenWrt firmware. Thus, before create repository to build your own firmware, you may check out if others have already built it which meet your needs by simply [search `Actions-Openwrt` in GitHub](https://github.com/search?q=Actions-openwrt).
-- Add some meta info of your built firmware (such as firmware architecture and installed packages) to your repository introduction, this will save others' time.
+2. **Official OpenWRT 主线**（新增，基于官方源码）：
+   ```bash
+   bash AllinOneBatch/AllinOne-official-x86.sh
+   ```
 
-## Acknowledgments
+### 区别说明
 
-- [Microsoft Azure](https://azure.microsoft.com)
-- [GitHub Actions](https://github.com/features/actions)
-- [OpenWrt](https://github.com/openwrt/openwrt)
-- [Lean's OpenWrt](https://github.com/coolsnowwolf/lede)
-- [tmate](https://github.com/tmate-io/tmate)
-- [mxschmitt/action-tmate](https://github.com/mxschmitt/action-tmate)
-- [csexton/debugger-action](https://github.com/csexton/debugger-action)
-- [Cowtransfer](https://cowtransfer.com)
-- [WeTransfer](https://wetransfer.com/)
-- [Mikubill/transfer](https://github.com/Mikubill/transfer)
-- [softprops/action-gh-release](https://github.com/softprops/action-gh-release)
-- [c-hive/gha-remove-artifacts](https://github.com/c-hive/gha-remove-artifacts)
-- [dev-drprasad/delete-older-releases](https://github.com/dev-drprasad/delete-older-releases)
+| 项目 | LEDE 分支 | Official 主线 |
+|------|-----------|---------------|
+| 基础仓库 | coolsnowwolf/lede | openwrt/openwrt |
+| 分区配置 | 保留（TARGET_ROOTFS_PARTSIZE=1024） | 保留 |
+| 目标平台 | x86_64 | x86_64 |
+| 插件 | 完整（Passwall, Xray, SmartDNS等） | 完整（兼容官方feeds） |
+| Theme | Argon | Argon |
+| Banner | Zed-7nian 定制 | Zed-7nian 定制 |
 
-## License
+## 配置文件说明
+
+- `MakeMenu.x86*.config` — `.config` 文件，包含所有插件选择、目标平台、分区大小等设置
+- `diy-*-part1.sh` — 在 `./scripts/feeds update -a` 之前执行的脚本
+- `diy-*-part2.sh` — 在 `./scripts/feeds install -a` 之后执行的脚本
+
+## 许可证
 
 [MIT](https://github.com/P3TERX/Actions-OpenWrt/blob/main/LICENSE) © P3TERX
