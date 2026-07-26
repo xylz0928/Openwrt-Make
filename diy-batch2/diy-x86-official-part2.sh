@@ -82,7 +82,7 @@ sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' b
 # ----------------------------------------------#
 
 ## Add Hello World (SSR Plus+)
-echo "src-git helloworld https://github.com/fw876/helloworld" >> ./feeds.conf.default
+# echo "src-git helloworld https://github.com/fw876/helloworld" >> ./feeds.conf.default
 
 ## Add Passwall packages
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
@@ -112,10 +112,10 @@ git clone --depth 1 https://github.com/tty228/luci-app-serverchan.git feeds/luci
 git clone --depth 1 https://github.com/zzsj0928/luci-app-pushbot.git package/luci-app-pushbot
 
 ## Add Adbyby
-git clone --depth 1 https://github.com/tindy2013/openwrt-packages.git package/adbyby-repo
-cp -r package/adbyby-repo/subscribes-reply package/
-cp -r package/adbyby-repo/luci-app-adbyby-plus package/
-rm -rf package/adbyby-repo
+# git clone --depth 1 https://github.com/tindy2013/openwrt-packages.git package/adbyby-repo
+# cp -r package/adbyby-repo/subscribes-reply package/
+# cp -r package/adbyby-repo/luci-app-adbyby-plus package/
+# rm -rf package/adbyby-repo
 
 ## Add easytier
 rm -rf feeds/packages/utils/easytier
@@ -125,19 +125,19 @@ rm -rf package/easytier
 mv easytier-openwrt package/easytier
 
 ## Add UWSGI (same as LEDE build)
-mkdir -p package/uwsgi
-cd package/uwsgi
-git init
-git remote add origin https://github.com/immortalwrt/packages.git
-git config core.sparsecheckout true
-echo "net/uwsgi/*" >> .git/info/sparse-checkout
-git pull origin master
-rm -rf net/uwsgi/files-luci-support
-cd ../..
-cp -r feeds/packages/net/uwsgi/files-luci-support package/uwsgi/net/uwsgi/
-rm -rf feeds/packages/net/uwsgi/*
-mv package/uwsgi/net/uwsgi/* feeds/packages/net/uwsgi/
-rm -rf package/uwsgi
+# mkdir -p package/uwsgi
+# cd package/uwsgi
+# git init
+# git remote add origin https://github.com/immortalwrt/packages.git
+# git config core.sparsecheckout true
+# echo "net/uwsgi/*" >> .git/info/sparse-checkout
+# git pull origin master
+# rm -rf net/uwsgi/files-luci-support
+# cd ../..
+# cp -r feeds/packages/net/uwsgi/files-luci-support package/uwsgi/net/uwsgi/
+# rm -rf feeds/packages/net/uwsgi/*
+# mv package/uwsgi/net/uwsgi/* feeds/packages/net/uwsgi/
+# rm -rf package/uwsgi
 
 # ----------------------------------------------#
 # Old proxy apps (commented, enable as needed)
