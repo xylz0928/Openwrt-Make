@@ -31,22 +31,38 @@ wget -O feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg 
 # Change icons
 svn co --depth files https://github.com/xylz0928/luci-mod/trunk/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons
 
-# 1. 启用 IMAGEOPT（只保留一行）
-sed -i '/^CONFIG_IMAGEOPT=/d' .config
-echo 'CONFIG_IMAGEOPT=y' >> .config
-
-# 2. 计算自定义版本代码
-CURRENT_REV=$(git describe --always 2>/dev/null || echo "unknown")
+# 1. 定义版本信息（与之前一致）
+CURRENT_REV=$(git describe --always 2>/dev/null || echo "Official")
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
 VERSION_CODE="r${CURRENT_REV}_R${DATE}_by_Zed-7nian"
 
-# 3. 设置 VERSION_CODE（先删除所有旧行，再追加）
-sed -i '/^CONFIG_VERSION_CODE=/d' .config
-echo "CONFIG_VERSION_CODE=\"${VERSION_CODE}\"" >> .config
+# 2. 创建 uci-defaults 脚本目录
+mkdir -p files/etc/uci-defaults
 
-# 4. 确保 VERSION_NUMBER 合法（同样先删除再追加）
-sed -i '/^CONFIG_VERSION_NUMBER=/d' .config
-echo 'CONFIG_VERSION_NUMBER="SNAPSHOT"' >> .config
+# 3. 写入脚本（使用 EOF 多行文本）
+cat > files/etc/uci-defaults/99-custom-version << 'EOF'
+#!/bin/sh
+# 自定义版本信息（首次启动时执行）
+
+# 自定义版本代码
+CUSTOM_VERSION="${VERSION_CODE}"
+
+# 修改 /etc/openwrt_release
+sed -i "s/^DISTRIB_REVISION=.*/DISTRIB_REVISION=\"${CUSTOM_VERSION}\"/" /etc/openwrt_release
+
+# 修改 /etc/os-release
+sed -i "s/^VERSION_CODE=.*/VERSION_CODE=\"${CUSTOM_VERSION}\"/" /etc/os-release
+sed -i "s/^VERSION=.*/VERSION=\"SNAPSHOT\"/" /etc/os-release
+
+# 脚本成功执行后自动删除
+exit 0
+EOF
+
+# 4. 将版本代码动态替换到脚本中（因为脚本内使用了变量）
+sed -i "s/\${VERSION_CODE}/${VERSION_CODE}/g" files/etc/uci-defaults/99-custom-version
+
+# 5. 设置可执行权限（可选，uci-defaults 通常要求可执行）
+chmod +x files/etc/uci-defaults/99-custom-version
 
 # Modify tty banner
 {
@@ -67,14 +83,15 @@ echo 'CONFIG_VERSION_NUMBER="SNAPSHOT"' >> .config
     echo " |_______||   __|_____|__|__||________||__|  |____|   "
     echo "          |__| W I R E L E S S   F R E E D O M        "
     echo " -----------------------------------------------------"
-    echo "  %D %V, %C                         "
+    echo "  %D %V, %C                          "
+    echo "  timestamp                         "
     echo " -----------------------------------------------------"
 
 } > /tmp/mark-official
 
 > package/base-files/files/etc/banner
 cat /tmp/mark-official >> package/base-files/files/etc/banner
-# sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by zed-7nian/g" package/base-files/files/etc/banner
+sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by zed-7nian/g" package/base-files/files/etc/banner
 
 # ----------------------------------------------#
 # Plugins from LEDE build (compatible with official)
