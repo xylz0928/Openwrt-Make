@@ -31,37 +31,52 @@ wget -O feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg 
 # Change icons
 svn co --depth files https://github.com/xylz0928/luci-mod/trunk/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons
 
-# 1. 定义版本信息（与之前一致）
+# 1. 定义变量（编译时确定）
 CURRENT_REV=$(git describe --always 2>/dev/null || echo "Official")
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
-VERSION_CODE="r${CURRENT_REV}_R${DATE}_by_Zed-7nian"
+CUSTOM_VERSION="R${DATE}_by_Zed-7nian"          # 用于 VERSION / PRETTY_NAME
+CUSTOM_REV="r${CURRENT_REV}_R${DATE}_by_Zed-7nian"   # 用于 DISTRIB_REVISION 等（完整版本代码）
 
 # 2. 创建 uci-defaults 脚本目录
 mkdir -p files/etc/uci-defaults
 
-# 3. 写入脚本（使用 EOF 多行文本）
+# 3. 写入 uci-defaults 脚本（使用占位符，后续替换）
 cat > files/etc/uci-defaults/99-custom-version << 'EOF'
 #!/bin/sh
 # 自定义版本信息（首次启动时执行）
 
-# 自定义版本代码
-CUSTOM_VERSION="${VERSION_CODE}"
+# 占位符将被替换为实际值
+CUSTOM_VERSION="@CUSTOM_VERSION@"
+CUSTOM_REV="@CUSTOM_REV@"
 
-# 修改 /etc/openwrt_release
-sed -i "s/^DISTRIB_REVISION=.*/DISTRIB_REVISION=\"${CUSTOM_VERSION}\"/" /etc/openwrt_release
+# 修改 /etc/openwrt_release（影响 LuCI 状态页和页脚）
+sed -i "s/^DISTRIB_RELEASE=.*/DISTRIB_RELEASE=\"${CUSTOM_VERSION}\"/" /etc/openwrt_release
+sed -i "s/^DISTRIB_REVISION=.*/DISTRIB_REVISION=\"${CUSTOM_REV}\"/" /etc/openwrt_release
 
 # 修改 /etc/os-release
-sed -i "s/^VERSION_CODE=.*/VERSION_CODE=\"${CUSTOM_VERSION}\"/" /etc/os-release
-sed -i "s/^VERSION=.*/VERSION=\"SNAPSHOT\"/" /etc/os-release
+sed -i "s/^VERSION=.*/VERSION=\"${CUSTOM_VERSION}\"/" /etc/os-release
+sed -i "s/^PRETTY_NAME=.*/PRETTY_NAME=\"OpenWrt ${CUSTOM_VERSION}\"/" /etc/os-release
 
-# 脚本成功执行后自动删除
+# 替换 URL
+sed -i "s|^HOME_URL=.*|HOME_URL=\"https://7ze.top/\"|" /etc/os-release
+sed -i "s|^BUG_URL=.*|BUG_URL=\"https://github.com/xylz0928/Openwrt-Make/issues/\"|" /etc/os-release
+sed -i "s|^SUPPORT_URL=.*|SUPPORT_URL=\"https://github.com/xylz0928/Openwrt-Make/\"|" /etc/os-release
+sed -i "s|^FIRMWARE_URL=.*|FIRMWARE_URL=\"https://github.com/xylz0928/Openwrt-Make/releases/\"|" /etc/os-release
+sed -i "s|^OPENWRT_DEVICE_MANUFACTURER_URL=.*|OPENWRT_DEVICE_MANUFACTURER_URL=\"https://github.com/xylz0928/Openwrt-Make/\"|" /etc/os-release
+
+# 获取原 BUILD_ID（保留不变）
+BUILD_ID=$(grep "^BUILD_ID=" /etc/os-release | cut -d'"' -f2)
+sed -i "s/^OPENWRT_RELEASE=.*/OPENWRT_RELEASE=\"OpenWrt ${CUSTOM_VERSION} ${BUILD_ID}\"/" /etc/os-release
+
+# 脚本执行后自动删除
 exit 0
 EOF
 
-# 4. 将版本代码动态替换到脚本中（因为脚本内使用了变量）
-sed -i "s/\${VERSION_CODE}/${VERSION_CODE}/g" files/etc/uci-defaults/99-custom-version
+# 4. 替换占位符为实际值
+sed -i "s/@CUSTOM_VERSION@/${CUSTOM_VERSION}/g" files/etc/uci-defaults/99-custom-version
+sed -i "s/@CUSTOM_REV@/${CUSTOM_REV}/g" files/etc/uci-defaults/99-custom-version
 
-# 5. 设置可执行权限（可选，uci-defaults 通常要求可执行）
+# 5. 设置可执行权限（uci-defaults 要求）
 chmod +x files/etc/uci-defaults/99-custom-version
 
 # Modify tty banner
