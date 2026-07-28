@@ -31,25 +31,15 @@ wget -O feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg 
 # Change icons
 svn co --depth files https://github.com/xylz0928/luci-mod/trunk/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons
 
-# Modify version info - web UI
-modelmark_os=R$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)_by_Zed-7nian
-modelmark_os_lower=r$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)_by_zed-7nian
-modelmark=R`TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours`' by Zed-7nian'
+# 获取当前 git 版本（保留 r0-xxx 格式）
+CURRENT_REV=$(git describe --always --dirty 2>/dev/null || echo "OP")
+# 计算编译完成预计时间（+3 小时）
+DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
+# 拼接新版本
+NEW_REV="${CURRENT_REV}_R${DATE}_by_Zed-7nian"
 
-# Create os-release patch script
-{
-    echo "sed -i \"s/VERSION=\\\".*\\\"/VERSION=\\\"$modelmark_os\\\"/g\" /etc/os-release"
-    echo "sed -i \"s/PRETTY_NAME=\\\".*\\\"/PRETTY_NAME=\\\"OpenWrt $modelmark_os\\\"/g\" /etc/os-release"
-    echo "sed -i \"s/VERSION_ID=\\\".*\\\"/VERSION_ID=\\\"$modelmark_os_lower\\\"/g\" /etc/os-release"
-    echo "sed -i 's|https://openwrt.org/|https://7nian.top/|g' /etc/os-release"
-    echo "sed -i 's|https://forum.openwrt.org|https://github.com/xylz0928/Openwrt-Make/actions|g' /etc/os-release"
-    echo "sed -i 's|https://bugs.openwrt.org|https://github.com/xylz0928/Openwrt-Make/issues|g' /etc/os-release"
-    echo "exit 0"
-} > /tmp/release-official
-
-# Patch luci-base Makefile to run our os-release changes
-sed -i '/^exit 0/d' feeds/luci/luci-base/Makefile
-cat /tmp/release-official >> feeds/luci/luci-base/Makefile
+# 修改 include/version.mk 中的 REVISION 定义
+sed -i "s/^REVISION:=.*/REVISION:=${NEW_REV}/" include/version.mk
 
 # Modify tty banner
 {
@@ -64,20 +54,20 @@ cat /tmp/release-official >> feeds/luci/luci-base/Makefile
     echo "  ▞▞▞  ▚▚▚ ▚▚▚ ▚▚▚ ▟  ██████      █████        ██     "
     echo "                                               ██     "
     echo " -----------------------------------------------------"
-    echo "     _________       _    ___ ___  ___                "
-    echo "    /        /\     | |  | __|   \| __|               "
-    echo "   /  OFI   /  \    | |__| _|| |) | _|                "
-    echo "  /    FI  /    \   |____|___|___/|___|               "
-    echo " /________/  OFI  \                                    "
-    echo " \        \   FI / -----------------------------------"
-    echo "  \    OFI \   /  %D %V, %C                          "
-    echo "   \  FI    \  /   timestamp                          "
-    echo "    \________\/    -----------------------------------"
+    echo "  _______                     ________        __      "
+    echo " |       |.-----.-----.-----.|  |  |  |.----.|  |_    "
+    echo " |   -   ||  _  |  -__|     ||  |  |  ||   _||   _|   "
+    echo " |_______||   __|_____|__|__||________||__|  |____|   "
+    echo "          |__| W I R E L E S S   F R E E D O M        "
+    echo " -----------------------------------------------------"
+    echo "  %D %V, %C                         "
+    echo " -----------------------------------------------------"
+
 } > /tmp/mark-official
 
-> feeds/luci/luci-base/root/etc/banner
-cat /tmp/mark-official >> feeds/luci/luci-base/root/etc/banner
-sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by zed-7nian/g" feeds/luci/luci-base/root/etc/banner
+> package/base-files/files/etc/banner
+cat /tmp/mark-official >> package/base-files/files/etc/banner
+# sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by zed-7nian/g" package/base-files/files/etc/banner
 
 # ----------------------------------------------#
 # Plugins from LEDE build (compatible with official)
