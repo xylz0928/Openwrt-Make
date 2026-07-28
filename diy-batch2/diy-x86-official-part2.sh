@@ -31,24 +31,22 @@ wget -O feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg 
 # Change icons
 svn co --depth files https://github.com/xylz0928/luci-mod/trunk/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons
 
-# 1. 计算你的自定义版本标识
-CURRENT_REV=$(git describe --always 2>/dev/null || echo "Official")
+# 1. 启用 IMAGEOPT（只保留一行）
+sed -i '/^CONFIG_IMAGEOPT=/d' .config
+echo 'CONFIG_IMAGEOPT=y' >> .config
+
+# 2. 计算自定义版本代码
+CURRENT_REV=$(git describe --always 2>/dev/null || echo "unknown")
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
 VERSION_CODE="r${CURRENT_REV}_R${DATE}_by_Zed-7nian"
 
-# 2. 将配置写入 .config（如果已存在则修改，否则追加）
-if grep -q "CONFIG_VERSION_CODE=" .config; then
-    sed -i "s/^CONFIG_VERSION_CODE=.*/CONFIG_VERSION_CODE=\"${VERSION_CODE}\"/" .config
-else
-    echo "CONFIG_VERSION_CODE=\"${VERSION_CODE}\"" >> .config
-fi
+# 3. 设置 VERSION_CODE（先删除所有旧行，再追加）
+sed -i '/^CONFIG_VERSION_CODE=/d' .config
+echo "CONFIG_VERSION_CODE=\"${VERSION_CODE}\"" >> .config
 
-# 确保 VERSION_NUMBER 是合法的 SNAPSHOT
-if grep -q "CONFIG_VERSION_NUMBER=" .config; then
-    sed -i 's/^CONFIG_VERSION_NUMBER=.*/CONFIG_VERSION_NUMBER="SNAPSHOT"/' .config
-else
-    echo 'CONFIG_VERSION_NUMBER="SNAPSHOT"' >> .config
-fi
+# 4. 确保 VERSION_NUMBER 合法（同样先删除再追加）
+sed -i '/^CONFIG_VERSION_NUMBER=/d' .config
+echo 'CONFIG_VERSION_NUMBER="SNAPSHOT"' >> .config
 
 # Modify tty banner
 {
