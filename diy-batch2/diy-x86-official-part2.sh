@@ -115,6 +115,7 @@ sed -i 's/bootstrap/argon/g' feeds/luci/collections/luci/Makefile
 
 # Remove the rependency of luci-app-speedtest
 sed -i 's/ +python3-email//' package/netspeedtest/luci-app-speedtest/Makefile
+sed -i 's/ +python3-pkg-resources//' package/netspeedtest/luci-app-speedtest/Makefile
 
 # Remove the default apps
 sed -i 's/luci-app-arpbind //g' include/target.mk >/dev/null 2>&1
