@@ -113,6 +113,9 @@ sed -i 's/bootstrap/argon/g' feeds/luci/collections/luci/Makefile
 # Modify default Hostname
 # sed -i 's/OpenWrt/Openwrtx86/g' package/base-files/files/bin/config_generate
 
+# Remove the rependency of luci-app-speedtest
+sed -i 's/ +python3-email//' package/netspeedtest/luci-app-speedtest/Makefile
+
 # Remove the default apps
 sed -i 's/luci-app-arpbind //g' include/target.mk >/dev/null 2>&1
 sed -i 's/luci-app-filetransfer //g' include/target.mk >/dev/null 2>&1
