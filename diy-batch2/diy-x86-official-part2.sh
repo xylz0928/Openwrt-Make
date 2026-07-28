@@ -33,13 +33,15 @@ svn co --depth files https://github.com/xylz0928/luci-mod/trunk/feeds/luci/modul
 
 # 获取当前 git 版本（保留 r0-xxx 格式）
 CURRENT_REV=$(git describe --always --dirty 2>/dev/null || echo "OP")
-# 计算编译完成预计时间（+3 小时）
+# 计算编译完成预计时间（+5 小时）
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
 # 拼接新版本
 NEW_REV="${CURRENT_REV}_R${DATE}_by_Zed-7nian"
 
-# 修改 include/version.mk 中的 REVISION 定义
-sed -i "s/^REVISION:=.*/REVISION:=${NEW_REV}/" include/version.mk
+# 删除可能存在的旧 REVISION 定义行（如果有）
+sed -i '/^REVISION:=/d' include/version.mk
+# 在文件末尾追加新的 REVISION 定义
+echo "REVISION:=${NEW_REV}" >> include/version.mk
 
 # Modify tty banner
 {
