@@ -14,6 +14,8 @@
 # ----------------------------------------------#
 # Theme & Banner - same as LEDE build
 # ----------------------------------------------#
+# Change Language
+sed -i "s/^\(\s*option\s\+lang\s\+\).*/\1'zh_cn'/" feeds/luci/modules/luci-base/root/etc/config/luci
 
 # Change default theme to argon
 rm -rf feeds/luci/themes/luci-theme-argon
