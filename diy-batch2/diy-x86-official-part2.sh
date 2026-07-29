@@ -213,8 +213,8 @@ git clone https://github.com/sirpdboy/luci-app-advanced package/luci-app-advance
 git clone https://github.com/sirpdboy/netspeedtest package/netspeedtest
 
 # Remove the rependency of luci-app-speedtest
-sed -i 's/ +python3-email//' package/netspeedtest/luci-app-speedtest/Makefile
-sed -i 's/ +python3-pkg-resources//' package/netspeedtest/luci-app-speedtest/Makefile
+sed -i 's/ +python3-email//g' package/netspeedtest/luci-app-speedtest/Makefile
+sed -i 's/ +python3-pkg-resources//g' package/netspeedtest/luci-app-speedtest/Makefile
 
 # Add SmartDNS
 # rm -rf ./feeds/packages/net/smartdns
