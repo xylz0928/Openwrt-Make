@@ -1,4 +1,4 @@
-#
+       #
 # Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
 #
 # This is free software, licensed under the MIT License.
@@ -8,7 +8,7 @@
 # Description: Build OpenWrt using GitHub Actions
 #
 
-name: Build OpenWrt-x86-OP-Official
+name: Build OpenWrt-x86-Official
 
 on:
   repository_dispatch:
@@ -18,60 +18,132 @@ on:
         description: 'SSH connection to Actions'
         required: false
         default: 'false'
-#  schedule:
-#    - cron: 10 14 * * 5
+  schedule:
+    - cron: 10 14 * * 5
 
 env:
   REPO_URL: https://github.com/openwrt/openwrt
   REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
   model: x86
-  CONFIG_FILE: config/MakeMenu.x86.opofficial.config
-  DIY_P1_SH: diy-batch1/diy-x86-opofficial-part1.sh
-  DIY_P2_SH: diy-batch2/diy-x86-opofficial-part2.sh
+  CONFIG_FILE: config/MakeMenu.x86-official.config
+  DIY_P1_SH: diy-batch1/diy-x86-official-part1.sh
+  DIY_P2_SH: diy-batch2/diy-x86-official-part2.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
+  UPLOAD_DIRECTORY: false
   UPLOAD_COWTRANSFER: false
-  UPLOAD_WETRANSFER: true
-  UPLOAD_RELEASE: false
+  UPLOAD_WETRANSFER: false
+  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   UPLOAD_ZZNAS: true
   ftp_username: ${{ secrets.FTP_USERNAME }}
   ftp_psw: ${{ secrets.FTP_PSW }}
   ftp_ip: ${{ secrets.FTP_IP }}
-  TargetPath: OpenwrtImgs/x86_64/x64
+  TargetPath: OpenwrtImgs/x86_64/x64-official
   upload_file_1: openwrt-x86-64-generic-squashfs-combined-efi.img.gz
-  upload_file_2: openwrt-x86-64-generic-squashfs-combined.img.gz
+  upload_file_2: openwrt-x86-64-generic-squashfs-combined-efi.qcow2
+  # upload_file_2: openwrt-x86-64-generic-squashfs-combined.img.gz
   upload_file_3: sha256sums
   whkey: ${{ secrets.WEBHOOK }}
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
+    - name: Check Server Hardware
+      if: (!cancelled())
+      run: |
+        echo "警告⚠"
+        echo "若分配的服务器性能不足，务必及时取消，重新运行！"
+        echo "已知编译成功CPU型号：8370C,8171M"
+        echo "已知性能不足CPU型号：8272CL,E5系列"
+        echo "--------------------------CPU信息--------------------------"
+        echo "CPU物理数量:$(cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l)"
+        echo -e "CPU核心及版本信息：$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
+        echo "--------------------------内存信息--------------------------"
+        echo "已安装内存详细信息："
+        sudo lshw -short -C memory | grep GiB
+        echo -e "\n"
+        
+    - name: Before freeing up disk space
+      run: |
+        echo "Before freeing up disk space"
+        echo "=============================================================================="
+        df -hT
+        echo "=============================================================================="
+
+    - name: "Optimize Disk Space"
+      uses: "hugoalh/disk-space-optimizer-ghaction@v0.8.1"
+      with:
+        operate_sudo: "True"
+        general_include: ".+"
+        general_exclude: |-
+          ^GCC$
+          ^G\+\+$
+          Clang
+          LLVM
+        docker_include: ".+"
+        docker_prune: "True"
+        docker_clean: "True"
+        apt_prune: "True"
+        apt_clean: "True"
+        homebrew_prune: "True"
+        homebrew_clean: "True"
+        npm_prune: "True"
+        npm_clean: "True"
+        os_swap: "True"
+
+#    - name: Freeing up disk space
+#      uses: easimon/maximize-build-space@master
+#      with: 
+#        root-reserve-mb: 3072
+#        swap-size-mb: 1
+#        remove-dotnet: 'true'
+#        remove-android: 'true'
+#        remove-haskell: 'true'
+#        remove-codeql: 'true'
+#        remove-docker-images: 'true'
+
+    - name: Free up disk space complete
+      run: |
+        echo "Free up disk space complete"
+        echo "=============================================================================="
+        df -hT
+        echo "=============================================================================="
+        
     - name: Checkout
       uses: actions/checkout@main
-
+      
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+        bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+        git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+        libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
+        mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools \
+        libpython3-dev qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
+        vim wget xmlto xxd zlib1g-dev python3-setuptools uwsgi uwsgi-plugin-python3 python3-dev
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+        sudo chown $USER:$GROUPS $GITHUB_WORKSPACE
+
+    - name: Switch GCC/GXX Version
+      uses: xylz0928/SwitchUbuntuGccGxxVersion@v1.0.7
+      with:
+        TargetVer: '12'
 
     - name: Clone source code
-      working-directory: /workdir
+      working-directory: ./
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+        ln -sf ./openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load custom feeds
       run: |
@@ -123,8 +195,8 @@ jobs:
       
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "::set-output name=status::success"
+        make -j$(nproc) || make -j4 || make -j4 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
@@ -146,14 +218,12 @@ jobs:
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
-        gzip *.img
-        rm -rf *.img
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=status::success"
+        echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware directory
       uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
+      if: env.UPLOAD_DIRECTORY == 'true' && steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
@@ -165,7 +235,7 @@ jobs:
         curl -fsSL git.io/file-transfer | sh
         ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
         echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
-        echo "::set-output name=url::$(cat cowtransfer.log | grep https | cut -f3 -d" ")"
+        echo "url=$(cat cowtransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to WeTransfer
       id: wetransfer
@@ -174,7 +244,27 @@ jobs:
         curl -fsSL git.io/file-transfer | sh
         ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
         echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
-        echo "::set-output name=url::$(cat wetransfer.log | grep https | cut -f3 -d" ")"
+        echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
+        
+    - name: Generate release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "release_tag=$model-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
+        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
         
     - name: Upload firmware to my NAS
       id: zz-nas
@@ -190,34 +280,76 @@ jobs:
         
         cd openwrt/bin/targets/*/*
         echo $ftp_psw > /tmp/rsync.psw && chmod 600 /tmp/rsync.psw
-        rsync -avrzP $upload_file_1 $upload_file_2 $upload_file_3 $ftp_username@$ftp_ip::$TargetPath/$(date +"%Y.%m.%d-%H%M")/ --password-file=/tmp/rsync.psw
-        echo "::warning file=zz-nas.com::All Released Files Uploaded to ZZ-NAS"
-        
+
+        transfer_with_retry() {
+          local file="$1"
+          local target="$2"
+          local retries=3
+          local attempt=1
+              
+          if [[ -z "$file" ]]; then
+            echo "⚠️  Skipping empty file parameter"
+            return 0
+          fi
+              
+          if ! ls $file >/dev/null 2>&1; then
+            echo "⚠️  File(s) matching '$file' not found, skipping"
+            return 0
+          fi
+              
+          while true; do
+            echo "🚀 Attempt $attempt: Transferring $file to $target"
+            if rsync -avzP --partial "$file" "$target" --password-file=/tmp/rsync.psw; then
+              echo "✅ Successfully transferred $file"
+              return 0
+            fi
+                  
+            if [[ $attempt -ge $retries ]]; then
+              echo "❌ Critical failure: $file failed after $retries attempts"
+              return 1
+            fi
+                  
+            echo "⚠️  Failed attempt $attempt for $file. Retrying in 5 seconds..."
+            sleep 5
+            ((attempt++))
+          done
+        }
+          
+        transfer_group() {
+          local target="$1"
+          shift
+          local files=("$@")
+          local error_occurred=0
+              
+          echo "===================== Transferring to $target ====================="
+              
+          for file in "${files[@]}"; do
+            if ! transfer_with_retry "$file" "$target"; then
+              error_occurred=1
+              echo "❌ File $file failed, skipping but continuing with others"
+            fi
+          done
+              
+          return $error_occurred
+        }
+          
+        timestamp=$(date +"%Y.%m.%d-%H%M")
+        target1="$ftp_username@$ftp_ip::$TargetPath/$timestamp/"
+          
+        group1=("$upload_file_1" "$upload_file_2" "$upload_file_3")
+         
+        transfer_group "$target1" "${group1[@]}" || {
+          echo "⚠️  One or more files in group 1 failed"
+        }
+          
+        rm -f /tmp/rsync.psw
+        echo "===================== Transfer Completed ====================="
         nowtime=`date "+%Y-%m-%d %H:%M:%S"`
         eval "$send_dingding \"${send_content2}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#92D050>${send_content2}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
-
-    - name: Generate release tag
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
-        touch release.txt
-        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
-        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-        echo "::set-output name=status::success"
-
-    - name: Upload firmware to release
-      uses: softprops/action-gh-release@v1
-      if: steps.tag.outputs.status == 'success' && !cancelled()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
-
+        echo "::warning file=zz-nas.com::All Released Files Uploaded to ZZ-NAS"
+        
     - name: Delete workflow runs
-      uses: GitRML/delete-workflow-runs@main
+      uses: xylz0928/delete-workflow-runs@main
       with:
         retain_days: 1
         keep_minimum_runs: 3
@@ -226,7 +358,7 @@ jobs:
       uses: dev-drprasad/delete-older-releases@v0.1.0
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        keep_latest: 3
+        keep_latest: 9
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
