@@ -161,6 +161,14 @@ git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytie
 rm -rf feeds/luci/applications/luci-app-openclash
 git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 
+# Add Zerotier
+git clone --depth 1 --filter=blob:none --sparse https://github.com/immortalwrt/luci.git tmp-immortal-luci
+cd tmp-immortal-luci
+git sparse-checkout set applications/luci-app-zerotier
+cd ../../
+mv tmp-immortal-luci/applications/luci-app-zerotier package/luci-app-zerotier
+rm -rf tmp-immortal-luci
+
 #----------------------------------------------#
 ### Old Apps
 #----------------------------------------------#
