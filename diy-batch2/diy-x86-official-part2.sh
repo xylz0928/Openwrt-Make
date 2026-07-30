@@ -16,17 +16,8 @@
 # ----------------------------------------------#
 
 
-# 计算日期
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
-# 生成自定义版本号 (注意：格式必须符合APK包版本规范)
-CUSTOM_VERSION="R${DATE}.by.Zed-7nian"
-
-# 写入 .config
-if grep -q "^CONFIG_VERSION_NUMBER=" .config; then
-    sed -i "s/^CONFIG_VERSION_NUMBER=.*/CONFIG_VERSION_NUMBER=\"${CUSTOM_VERSION}\"/" .config
-else
-    echo "CONFIG_VERSION_NUMBER=\"${CUSTOM_VERSION}\"" >> .config
-fi
+sed -i "s/ZEDCOMPILEDATE/${DATE}/g" .config
 
 # Modify tty banner
 {
