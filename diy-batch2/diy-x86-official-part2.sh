@@ -60,11 +60,11 @@ sed -i "s/^\(\s*option\s\+lang\s\+\).*/\1'zh_cn'/" feeds/luci/modules/luci-base/
 # Change Argon Theme
 # rm -rf ./package/lean/luci-theme-argon 
 rm -rf ./feeds/luci/themes/luci-theme-argon
-git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git feeds/luci/themes/luci-theme-argon
+git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 # Argon Theme 18.06
 #git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git ./package/luci-theme-argon
 
-git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config.git feeds/luci/applications/luci-app-argon-config
+git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
 
 # Change default background image
 mkdir -p feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img
