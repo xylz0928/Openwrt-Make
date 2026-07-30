@@ -17,4 +17,4 @@
 # sed -i -e '/^#/d' feeds.conf.default
 
 # Add third-party feed sources
-echo "src-git helloworld https://github.com/fw876/helloworld" >> feeds.conf.default
+# echo "src-git helloworld https://github.com/fw876/helloworld" >> feeds.conf.default
