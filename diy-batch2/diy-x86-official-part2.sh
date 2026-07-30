@@ -18,6 +18,7 @@
 
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
 sed -i "s/ZEDCOMPILEDATE/${DATE}/g" .config
+sed -i "s/ZEDCOMPILEDATE/${DATE}/g" MakeMenu.x86-official.config
 
 # Modify tty banner
 {
