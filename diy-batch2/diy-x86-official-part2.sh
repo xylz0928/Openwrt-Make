@@ -67,8 +67,8 @@ git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon.git package/lu
 git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
 
 # Change default background image
-mkdir -p feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img
-wget -O feeds/luci/themes/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg https://github.com/xylz0928/luci-mod/raw/main/Background/MontereyDark.jpg
+mkdir -p package/luci-theme-argon/htdocs/luci-static/argon/img
+wget -O package/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg https://github.com/xylz0928/luci-mod/raw/main/Background/MontereyDark.jpg
 # svn co https://github.com/xylz0928/luci-mod/trunk/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons ./package/lucimod
 
 # Change the default icons
