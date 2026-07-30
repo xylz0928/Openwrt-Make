@@ -16,18 +16,17 @@
 # ----------------------------------------------#
 
 
-# 定义版本变量
-CURRENT_REV=$(git describe --always 2>/dev/null || echo "Official")
+# 计算日期
 DATE=$(TZ=Asia/Shanghai date -d '+5 hours' +%Y-%m-%d)
-CUSTOM_VERSION="R${DATE}_by_Zed-7nian"
-CUSTOM_REV="r${CURRENT_REV}_R${DATE}_by_Zed-7nian"
+# 生成自定义版本号 (注意：格式必须符合APK包版本规范)
+CUSTOM_VERSION="R${DATE}.by.Zed-7nian"
 
-# 复制模板并替换占位符
-mkdir -p files/etc/uci-defaults
-wget -O files/etc/uci-defaults/99-custom-version https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/files/etc/uci-defaults/99-custom-version
-sed -i "s/@CUSTOM_VERSION@/${CUSTOM_VERSION}/g" files/etc/uci-defaults/99-custom-version
-sed -i "s/@CUSTOM_REV@/${CUSTOM_REV}/g" files/etc/uci-defaults/99-custom-version
-chmod +x files/etc/uci-defaults/99-custom-version
+# 写入 .config
+if grep -q "^CONFIG_VERSION_NUMBER=" .config; then
+    sed -i "s/^CONFIG_VERSION_NUMBER=.*/CONFIG_VERSION_NUMBER=\"${CUSTOM_VERSION}\"/" .config
+else
+    echo "CONFIG_VERSION_NUMBER=\"${CUSTOM_VERSION}\"" >> .config
+fi
 
 # Modify tty banner
 {
@@ -49,14 +48,13 @@ chmod +x files/etc/uci-defaults/99-custom-version
     echo "          |__| W I R E L E S S   F R E E D O M        "
     echo " -----------------------------------------------------"
     echo "  %D %V, %C                          "
-    echo "  timestamp                         "
     echo " -----------------------------------------------------"
 
 } > /tmp/mark-official
 
 > package/base-files/files/etc/banner
 cat /tmp/mark-official >> package/base-files/files/etc/banner
-sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by zed-7nian/g" package/base-files/files/etc/banner
+# sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' by zed-7nian/g" package/base-files/files/etc/banner
 
 # ----------------------------------------------#
 # UI and Theme
