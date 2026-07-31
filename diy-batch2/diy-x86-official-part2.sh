@@ -151,13 +151,29 @@ git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytie
 rm -rf feeds/luci/applications/luci-app-openclash
 git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 
-# Add Zerotier
-git clone --depth 1 --filter=blob:none --sparse https://github.com/immortalwrt/luci.git tmp-immortal-luci
-cd tmp-immortal-luci
-git sparse-checkout set applications/luci-app-zerotier
-cd ../../
-mv tmp-immortal-luci/applications/luci-app-zerotier package/luci-app-zerotier
-rm -rf tmp-immortal-luci
+# Add lucky
+git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lucky
+
+# 批量拉取 ImmortalWrt 的 LuCI 应用
+# 定义需要拉取的插件列表
+APPS="luci-app-zerotier luci-app-homeproxy"
+
+for APP in $APPS; do
+    # 如果目录已存在则删除
+    rm -rf package/$APP
+    
+    # 稀疏检出指定应用
+    git clone --depth=1 --filter=blob:none --sparse \
+        https://github.com/immortalwrt/luci.git package/$APP
+    
+    cd package/$APP
+    git sparse-checkout set applications/$APP
+    
+    # 将子目录内容移动到根目录
+    mv applications/$APP/* ./
+    rm -rf applications .git
+    cd ../..
+done
 
 #----------------------------------------------#
 ### Old Apps
