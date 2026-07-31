@@ -163,7 +163,7 @@ for APP in $APPS; do
     rm -rf package/$APP
     
     # 稀疏检出指定应用
-    git clone --depth=1 --filter=blob:none --sparse \
+    git clone --depth=1 --filter=blob:none --sparse -b master \
         https://github.com/immortalwrt/luci.git package/$APP
     
     cd package/$APP
@@ -174,6 +174,29 @@ for APP in $APPS; do
     rm -rf applications .git
     cd ../..
 done
+
+
+# 批量拉取 LEDE 的 LuCI 应用
+# 定义需要拉取的插件列表
+APPS="luci-app-turboacc"
+
+for APP in $APPS; do
+    # 如果目录已存在则删除
+    rm -rf package/$APP
+    
+    # 稀疏检出指定应用
+    git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 \
+        https://github.com/coolsnowwolf/luci.git package/$APP
+    
+    cd package/$APP
+    git sparse-checkout set applications/$APP
+    
+    # 将子目录内容移动到根目录
+    mv applications/$APP/* ./
+    rm -rf applications .git
+    cd ../..
+done
+
 
 #----------------------------------------------#
 ### Old Apps
