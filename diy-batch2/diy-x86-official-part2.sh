@@ -168,6 +168,18 @@ for immortalAPP in $immortalAPPS; do
     sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
 done
 
+immortalPACKS="vlmcsd"
+for immortalPACK in $immortalPACKS; do
+    rm -rf package/$immortalPACK
+    git clone --depth=1 --filter=blob:none --sparse -b master \
+        https://github.com/immortalwrt/packages.git package/$immortalPACK
+    cd package/$immortalPACK
+    git sparse-checkout set net/$immortalPACK
+    mv net/$immortalPACK/* ./
+    rm -rf net .git
+    cd ../..
+done
+
 # 批量拉取 LEDE 的 LuCI 应用
 LEDEAPPS="luci-app-turboacc"
 # LEDE 循环（同样修正）
