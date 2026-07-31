@@ -225,7 +225,7 @@ jobs:
       uses: actions/upload-artifact@main
       if: env.UPLOAD_DIRECTORY == 'true' && steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt_firmware_LEDE_${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
     - name: Upload firmware to cowtransfer
