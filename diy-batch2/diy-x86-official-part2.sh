@@ -202,7 +202,7 @@ for LEDEPACK in $LEDEQCAPACKS; do
         https://github.com/immortalwrt/packages.git package/$LEDEQCAPACK
     cd package/$LEDEQCAPACK
     git sparse-checkout set package/qca/shortcut-fe/$LEDEQCAPACK
-    mv net/$LEDEQCAPACK/* ./
+    mv package/qca/shortcut-fe/$LEDEQCAPACK/* ./
     rm -rf package .git
     cd ../..
 done
