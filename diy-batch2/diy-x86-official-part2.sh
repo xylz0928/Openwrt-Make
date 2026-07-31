@@ -154,57 +154,80 @@ git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-
 # Add lucky
 git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lucky
 
-# 批量拉取 ImmortalWrt 的 LuCI 应用
+# 通用函数：安全删除目录（仅当变量非空）
+safe_rm() {
+    if [ -n "$1" ]; then
+        rm -rf "$1"
+    else
+        echo "错误：尝试删除空路径，跳过" >&2
+        return 1
+    fi
+}
+
+# 1. ImmortalWrt LuCI 应用
 immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
 for immortalAPP in $immortalAPPS; do
-    rm -rf immortalAPP/$immortalAPP
+    safe_rm "immortalAPP/$immortalAPP"
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/luci.git immortalAPP/$immortalAPP
-    cd immortalAPP/$immortalAPP
-    git sparse-checkout set applications/$immortalAPP
-    mv applications/$immortalAPP/* ./
-    rm -rf applications .git
-    cd ../..
-    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' immortalAPP/$immortalAPP/Makefile
+        https://github.com/immortalwrt/luci.git "immortalAPP/$immortalAPP"
+    (cd "immortalAPP/$immortalAPP" && \
+        git sparse-checkout set "applications/$immortalAPP" && \
+        mv "applications/$immortalAPP"/* ./ && \
+        rm -rf applications .git)
+    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' "immortalAPP/$immortalAPP/Makefile"
 done
 
+# 2. ImmortalWrt 软件包（vlmcsd）
 immortalPACKS="vlmcsd"
 for immortalPACK in $immortalPACKS; do
-    rm -rf immortalPACK/$immortalPACK
+    safe_rm "immortalPACK/$immortalPACK"
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/packages.git immortalPACK/$immortalPACK
-    cd immortalPACK/$immortalPACK
-    git sparse-checkout set net/$immortalPACK
-    mv net/$immortalPACK/* ./
-    rm -rf net .git
-    cd ../..
+        https://github.com/immortalwrt/packages.git "immortalPACK/$immortalPACK"
+    (cd "immortalPACK/$immortalPACK" && \
+        git sparse-checkout set "net/$immortalPACK" && \
+        mv "net/$immortalPACK"/* ./ && \
+        rm -rf net .git)
 done
 
-# 批量拉取 LEDE 的 LuCI 应用
+# 3. LEDE LuCI 应用
 LEDEAPPS="luci-app-turboacc"
-# LEDE 循环（同样修正）
 for LEDEAPP in $LEDEAPPS; do
-    rm -rf LEDEAPP/$LEDEAPP
+    safe_rm "LEDEAPP/$LEDEAPP"
+    # 注意：分支名称请确认是否存在，若不存在则去掉 -b 参数
     git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 \
-        https://github.com/coolsnowwolf/luci.git LEDEAPP/$LEDEAPP
-    cd LEDEAPP/$LEDEAPP
-    git sparse-checkout set applications/$LEDEAPP
-    mv applications/$LEDEAPP/* ./
-    rm -rf applications .git
-    cd ../..
-    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' LEDEAPP/$LEDEAPP/Makefile
+        https://github.com/coolsnowwolf/luci.git "LEDEAPP/$LEDEAPP"
+    (cd "LEDEAPP/$LEDEAPP" && \
+        git sparse-checkout set "applications/$LEDEAPP" && \
+        mv "applications/$LEDEAPP"/* ./ && \
+        rm -rf applications .git)
+    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' "LEDEAPP/$LEDEAPP/Makefile"
 done
 
+# 4. QCA 加速包（fast-classifier, shortcut-fe）
 LEDEQCAPACKS="fast-classifier shortcut-fe simulated-driver"
 for LEDEQCAPACK in $LEDEQCAPACKS; do
-    rm -rf LEDEQCAPACK/$LEDEQCAPACK
+    safe_rm "LEDEQCAPACK/$LEDEQCAPACK"
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/packages.git LEDEQCAPACK/$LEDEQCAPACK
-    cd LEDEQCAPACK/$LEDEQCAPACK
-    git sparse-checkout set LEDEQCAPACK/qca/shortcut-fe/$LEDEQCAPACK
-    mv LEDEQCAPACK/$LEDEQCAPACK/* ./
-    rm -rf package .git
-    cd ../..
+        https://github.com/immortalwrt/packages.git "LEDEQCAPACK/$LEDEQCAPACK"
+    (cd "LEDEQCAPACK/$LEDEQCAPACK" && \
+        git sparse-checkout set "package/qca/shortcut-fe/$LEDEQCAPACK" && \
+        mv "package/qca/shortcut-fe/$LEDEQCAPACK"/* ./ && \
+        rm -rf package .git)
+done
+
+# 5. 创建符号链接到 package/（让 OpenWrt 识别这些包）
+echo "创建符号链接到 package/ ..."
+mkdir -p package
+
+# 链接所有独立目录下的包到 package/
+for dir in immortalAPP LEDEAPP immortalPACK LEDEQCAPACK; do
+    if [ -d "$dir" ]; then
+        for pkg in $(ls -d "$dir"/*/ 2>/dev/null | xargs -n1 basename); do
+            if [ -n "$pkg" ]; then
+                ln -sf "../$dir/$pkg" "package/$pkg" 2>/dev/null || true
+            fi
+        done
+    fi
 done
 
 #----------------------------------------------#
