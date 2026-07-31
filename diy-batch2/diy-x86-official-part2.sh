@@ -203,7 +203,7 @@ for LEDEPACK in $LEDEQCAPACKS; do
     cd package/$LEDEQCAPACK
     git sparse-checkout set package/qca/shortcut-fe/$LEDEQCAPACK
     mv net/$LEDEQCAPACK/* ./
-    rm -rf net .git
+    rm -rf package .git
     cd ../..
 done
 
