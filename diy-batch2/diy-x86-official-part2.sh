@@ -157,23 +157,23 @@ git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lu
 # 批量拉取 ImmortalWrt 的 LuCI 应用
 immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
 for immortalAPP in $immortalAPPS; do
-    rm -rf package/$immortalAPP
+    rm -rf immortalAPP/$immortalAPP
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/luci.git package/$immortalAPP
-    cd package/$immortalAPP
+        https://github.com/immortalwrt/luci.git immortalAPP/$immortalAPP
+    cd immortalAPP/$immortalAPP
     git sparse-checkout set applications/$immortalAPP
     mv applications/$immortalAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
+    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' immortalAPP/$immortalAPP/Makefile
 done
 
 immortalPACKS="vlmcsd"
 for immortalPACK in $immortalPACKS; do
-    rm -rf package/$immortalPACK
+    rm -rf immortalPACK/$immortalPACK
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/packages.git package/$immortalPACK
-    cd package/$immortalPACK
+        https://github.com/immortalwrt/packages.git immortalPACK/$immortalPACK
+    cd immortalPACK/$immortalPACK
     git sparse-checkout set net/$immortalPACK
     mv net/$immortalPACK/* ./
     rm -rf net .git
@@ -184,25 +184,25 @@ done
 LEDEAPPS="luci-app-turboacc"
 # LEDE 循环（同样修正）
 for LEDEAPP in $LEDEAPPS; do
-    rm -rf package/$LEDEAPP
+    rm -rf LEDEAPP/$LEDEAPP
     git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 \
-        https://github.com/coolsnowwolf/luci.git package/$LEDEAPP
-    cd package/$LEDEAPP
+        https://github.com/coolsnowwolf/luci.git LEDEAPP/$LEDEAPP
+    cd LEDEAPP/$LEDEAPP
     git sparse-checkout set applications/$LEDEAPP
     mv applications/$LEDEAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
+    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' LEDEAPP/$LEDEAPP/Makefile
 done
 
-LEDEQCAPACKS="fast-classifier shortcut-fe simulated-driver"
-for LEDEPACK in $LEDEQCAPACKS; do
-    rm -rf package/$LEDEQCAPACK
+LEDEQCAPACKS="fast-classifier shortcut-fe"
+for LEDEQCAPACK in $LEDEQCAPACKS; do
+    rm -rf LEDEQCAPACK/$LEDEQCAPACK
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/packages.git package/$LEDEQCAPACK
-    cd package/$LEDEQCAPACK
-    git sparse-checkout set package/qca/shortcut-fe/$LEDEQCAPACK
-    mv package/qca/shortcut-fe/$LEDEQCAPACK/* ./
+        https://github.com/immortalwrt/packages.git LEDEQCAPACK/$LEDEQCAPACK
+    cd LEDEQCAPACK/$LEDEQCAPACK
+    git sparse-checkout set LEDEQCAPACK/qca/shortcut-fe/$LEDEQCAPACK
+    mv LEDEQCAPACK/$LEDEQCAPACK/* ./
     rm -rf package .git
     cd ../..
 done
