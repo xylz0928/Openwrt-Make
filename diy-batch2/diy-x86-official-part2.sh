@@ -177,8 +177,10 @@ for immortalAPP in $immortalAPPS; do
     sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' "immortalAPP/$immortalAPP/Makefile"
 done
 
+rm -rf feeds/packages/net/ddns-scripts
+
 # 2. ImmortalWrt 软件包（vlmcsd）
-immortalPACKS="vlmcsd"
+immortalPACKS="vlmcsd ddns-scripts"
 for immortalPACK in $immortalPACKS; do
     safe_rm "immortalPACK/$immortalPACK"
     git clone --depth=1 --filter=blob:none --sparse -b master \
