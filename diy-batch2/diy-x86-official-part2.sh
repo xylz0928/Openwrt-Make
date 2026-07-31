@@ -155,8 +155,8 @@ git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-
 git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lucky
 
 # 批量拉取 ImmortalWrt 的 LuCI 应用
-APPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
-for immortalAPP in $APPS; do
+immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
+for immortalAPP in $immortalAPPS; do
     rm -rf package/$immortalAPP
     git clone --depth=1 --filter=blob:none --sparse -b master \
         https://github.com/immortalwrt/luci.git package/$immortalAPP
@@ -165,11 +165,12 @@ for immortalAPP in $APPS; do
     mv applications/$immortalAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^[[:space:]]*include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
+    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
 done
 
 # 批量拉取 LEDE 的 LuCI 应用
 LEDEAPPS="luci-app-turboacc"
+# LEDE 循环（同样修正）
 for LEDEAPP in $LEDEAPPS; do
     rm -rf package/$LEDEAPP
     git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 \
@@ -179,7 +180,7 @@ for LEDEAPP in $LEDEAPPS; do
     mv applications/$LEDEAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^[[:space:]]*include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
+    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
 done
 
 
