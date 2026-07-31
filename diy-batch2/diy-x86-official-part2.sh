@@ -156,7 +156,7 @@ git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lu
 
 # 批量拉取 ImmortalWrt 的 LuCI 应用
 # 定义需要拉取的插件列表
-APPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd"
+APPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
 
 for APP in $APPS; do
     # 如果目录已存在则删除
