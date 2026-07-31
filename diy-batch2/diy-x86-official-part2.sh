@@ -155,44 +155,27 @@ git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-
 git clone --depth=1 https://github.com/gdy666/luci-app-lucky package/luci-app-lucky
 
 # 批量拉取 ImmortalWrt 的 LuCI 应用
-# 定义需要拉取的插件列表
 APPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
-
-for immortalAPP in $immortalAPPS; do
-    # 如果目录已存在则删除
+for immortalAPP in $APPS; do
     rm -rf package/$immortalAPP
-    
-    # 稀疏检出指定应用
     git clone --depth=1 --filter=blob:none --sparse -b master \
         https://github.com/immortalwrt/luci.git package/$immortalAPP
-    
     cd package/$immortalAPP
     git sparse-checkout set applications/$immortalAPP
-    
-    # 将子目录内容移动到根目录
     mv applications/$immortalAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^[[:space:]]*include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
+    sed -i 's|^[[:space:]]*include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
 done
 
-
 # 批量拉取 LEDE 的 LuCI 应用
-# 定义需要拉取的插件列表
 LEDEAPPS="luci-app-turboacc"
-
 for LEDEAPP in $LEDEAPPS; do
-    # 如果目录已存在则删除
     rm -rf package/$LEDEAPP
-    
-    # 稀疏检出指定应用
     git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 \
         https://github.com/coolsnowwolf/luci.git package/$LEDEAPP
-    
     cd package/$LEDEAPP
     git sparse-checkout set applications/$LEDEAPP
-    
-    # 将子目录内容移动到根目录
     mv applications/$LEDEAPP/* ./
     rm -rf applications .git
     cd ../..
