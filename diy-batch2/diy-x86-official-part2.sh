@@ -195,6 +195,17 @@ for LEDEAPP in $LEDEAPPS; do
     sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
 done
 
+LEDEQCAPACKS="fast-classifier shortcut-fe simulated-driver"
+for LEDEPACK in $LEDEQCAPACKS; do
+    rm -rf package/$LEDEQCAPACK
+    git clone --depth=1 --filter=blob:none --sparse -b master \
+        https://github.com/immortalwrt/packages.git package/$LEDEQCAPACK
+    cd package/$LEDEQCAPACK
+    git sparse-checkout set package/qca/shortcut-fe/$LEDEQCAPACK
+    mv net/$LEDEQCAPACK/* ./
+    rm -rf net .git
+    cd ../..
+done
 
 #----------------------------------------------#
 ### Old Apps
