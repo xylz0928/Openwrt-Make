@@ -173,6 +173,7 @@ for immortalAPP in $immortalAPPS; do
     mv applications/$immortalAPP/* ./
     rm -rf applications .git
     cd ../..
+    sed -i 's|^[[:space:]]*include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
 done
 
 
