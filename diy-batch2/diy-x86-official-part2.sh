@@ -195,7 +195,7 @@ for LEDEAPP in $LEDEAPPS; do
     sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' LEDEAPP/$LEDEAPP/Makefile
 done
 
-LEDEQCAPACKS="fast-classifier shortcut-fe"
+LEDEQCAPACKS="fast-classifier shortcut-fe simulated-driver"
 for LEDEQCAPACK in $LEDEQCAPACKS; do
     rm -rf LEDEQCAPACK/$LEDEQCAPACK
     git clone --depth=1 --filter=blob:none --sparse -b master \
