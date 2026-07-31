@@ -165,7 +165,7 @@ for immortalAPP in $immortalAPPS; do
     mv applications/$immortalAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
+    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$immortalAPP/Makefile
 done
 
 # 批量拉取 LEDE 的 LuCI 应用
@@ -180,7 +180,7 @@ for LEDEAPP in $LEDEAPPS; do
     mv applications/$LEDEAPP/* ./
     rm -rf applications .git
     cd ../..
-    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
+    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' package/$LEDEAPP/Makefile
 done
 
 
