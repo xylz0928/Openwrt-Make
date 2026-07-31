@@ -174,7 +174,7 @@ for immortalAPP in $immortalAPPS; do
         git sparse-checkout set "applications/$immortalAPP" && \
         mv "applications/$immortalAPP"/* ./ && \
         rm -rf applications .git)
-    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' "immortalAPP/$immortalAPP/Makefile"
+    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' "immortalAPP/$immortalAPP/Makefile"
 done
 
 # 2. ImmortalWrt 软件包（vlmcsd）
@@ -200,20 +200,18 @@ for LEDEAPP in $LEDEAPPS; do
         git sparse-checkout set "applications/$LEDEAPP" && \
         mv "applications/$LEDEAPP"/* ./ && \
         rm -rf applications .git)
-    sed -i 's|^include .*luci.mk|include $$(TOPDIR)/feeds/luci/luci.mk|' "LEDEAPP/$LEDEAPP/Makefile"
+    sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' "LEDEAPP/$LEDEAPP/Makefile"
 done
 
 # 4. QCA 加速包（fast-classifier, shortcut-fe）
-LEDEQCAPACKS="fast-classifier shortcut-fe simulated-driver"
-for LEDEQCAPACK in $LEDEQCAPACKS; do
-    safe_rm "LEDEQCAPACK/$LEDEQCAPACK"
-    git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/packages.git "LEDEQCAPACK/$LEDEQCAPACK"
-    (cd "LEDEQCAPACK/$LEDEQCAPACK" && \
-        git sparse-checkout set "package/qca/shortcut-fe/$LEDEQCAPACK" && \
-        mv "package/qca/shortcut-fe/$LEDEQCAPACK"/* ./ && \
-        rm -rf package .git)
-done
+LEDEQCAPACK="shortcut-fe"
+safe_rm "LEDEQCAPACK/$LEDEQCAPACK"
+git clone --depth=1 --filter=blob:none --sparse -b master \
+    https://github.com/coolsnowwolf/lede.git "LEDEQCAPACK/$LEDEQCAPACK"
+(cd "LEDEQCAPACK/$LEDEQCAPACK" && \
+    git sparse-checkout set "package/qca/shortcut-fe" && \
+    mv package/qca/shortcut-fe/* ./ && \
+    rm -rf package .git)
 
 # 5. 创建符号链接到 package/（让 OpenWrt 识别这些包）
 echo "创建符号链接到 package/ ..."
