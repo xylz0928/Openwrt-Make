@@ -165,8 +165,8 @@ safe_rm() {
 }
 
 # rm -rf feeds/packages/applications/luci-app-ddns
-rm -rf feeds/packages/applications/luci-app-frps
-rm -rf feeds/packages/applications/luci-app-frpc
+# rm -rf feeds/packages/applications/luci-app-frps
+# rm -rf feeds/packages/applications/luci-app-frpc
 
 # 1. ImmortalWrt LuCI 应用
 immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
@@ -182,12 +182,12 @@ for immortalAPP in $immortalAPPS; do
     sed -i 's|^include .*luci.mk|include $(TOPDIR)/feeds/luci/luci.mk|' "immortalAPP/$immortalAPP/Makefile"
 done
 
-rm -rf feeds/packages/net/ddns-scripts
+# rm -rf feeds/packages/net/ddns-scripts
 # rm -rf feeds/packages/net/frp
 
 # 2. ImmortalWrt 软件包（vlmcsd）
-immortalPACKS="vlmcsd ddns-scripts"
-# frp
+immortalPACKS="vlmcsd"
+# frp ddns-scripts
 for immortalPACK in $immortalPACKS; do
     safe_rm "immortalPACK/$immortalPACK"
     git clone --depth=1 --filter=blob:none --sparse -b master \
@@ -222,12 +222,25 @@ git clone --depth=1 --filter=blob:none --sparse -b master \
     mv package/qca/shortcut-fe/* ./ && \
     rm -rf package .git)
 
-# 5. 创建符号链接到 package/（让 OpenWrt 识别这些包）
+# 5. LEDE PACK
+LEDEPACKS="ddns-scripts_aliyun ddns-scripts_dnspod"
+# frp
+for LEDEPACK in $LEDEPACKS; do
+    safe_rm "LEDEPACK/$LEDEPACK"
+    git clone --depth=1 --filter=blob:none --sparse -b master \
+        https://github.com/immortalwrt/packages.git "LEDEPACK/$LEDEPACK"
+    (cd "LEDEPACK/$LEDEPACK" && \
+        git sparse-checkout set "lean/$LEDEPACK" && \
+        mv "lean/$LEDEPACK"/* ./ && \
+        rm -rf net .git)
+done
+
+# 6. 创建符号链接到 package/（让 OpenWrt 识别这些包）
 echo "创建符号链接到 package/ ..."
 mkdir -p package
 
-# 链接所有独立目录下的包到 package/
-for dir in immortalAPP LEDEAPP immortalPACK LEDEQCAPACK; do
+# 7. 链接所有独立目录下的包到 package/
+for dir in immortalAPP LEDEAPP immortalPACK LEDEQCAPACK LEDEPACK; do
     if [ -d "$dir" ]; then
         for pkg in $(ls -d "$dir"/*/ 2>/dev/null | xargs -n1 basename); do
             if [ -n "$pkg" ]; then
