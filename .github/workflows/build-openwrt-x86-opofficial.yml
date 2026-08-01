@@ -185,7 +185,9 @@ jobs:
     - name: Pre-build frp (single thread)
       run: |
         cd openwrt
-        make -j1 package/feeds/packages/frp/compile V=s
+        make -j$(nproc) toolchain/install
+        make -j$(nproc) package/feeds/packages/python3/host/compile
+        make -j1 package/feeds/packages/frp/compile
 
     - name: Compile the firmware
       id: compile
