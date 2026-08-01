@@ -187,7 +187,7 @@ jobs:
         cd openwrt
         make -j$(nproc) toolchain/install
         make -j$(nproc) package/feeds/packages/python3/host/compile
-        make -j1 package/feeds/packages/frp/compile
+        make -j1 package/feeds/packages/frp/compile V=s
 
     - name: Compile the firmware
       id: compile
