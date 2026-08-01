@@ -164,12 +164,13 @@ safe_rm() {
     fi
 }
 
-rm -rf feeds/packages/applications/luci-app-ddns
+# rm -rf feeds/packages/applications/luci-app-ddns
 rm -rf feeds/packages/applications/luci-app-frps
 rm -rf feeds/packages/applications/luci-app-frpc
 
 # 1. ImmortalWrt LuCI 应用
-immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer luci-app-ddns luci-app-frps luci-app-frpc"
+immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
+# luci-app-ddns luci-app-frps luci-app-frpc
 for immortalAPP in $immortalAPPS; do
     safe_rm "immortalAPP/$immortalAPP"
     git clone --depth=1 --filter=blob:none --sparse -b master \
@@ -182,10 +183,11 @@ for immortalAPP in $immortalAPPS; do
 done
 
 rm -rf feeds/packages/net/ddns-scripts
-rm -rf feeds/packages/net/frp
+# rm -rf feeds/packages/net/frp
 
 # 2. ImmortalWrt 软件包（vlmcsd）
-immortalPACKS="vlmcsd ddns-scripts frp"
+immortalPACKS="vlmcsd ddns-scripts"
+# frp
 for immortalPACK in $immortalPACKS; do
     safe_rm "immortalPACK/$immortalPACK"
     git clone --depth=1 --filter=blob:none --sparse -b master \
