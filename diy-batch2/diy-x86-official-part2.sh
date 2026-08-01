@@ -164,8 +164,10 @@ safe_rm() {
     fi
 }
 
+rm -rf feeds/packages/applications/luci-app-ddns
+
 # 1. ImmortalWrt LuCI 应用
-immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer"
+immortalAPPS="luci-app-zerotier luci-app-homeproxy luci-app-vlmcsd luci-app-usb-printer luci-app-ddns"
 for immortalAPP in $immortalAPPS; do
     safe_rm "immortalAPP/$immortalAPP"
     git clone --depth=1 --filter=blob:none --sparse -b master \
