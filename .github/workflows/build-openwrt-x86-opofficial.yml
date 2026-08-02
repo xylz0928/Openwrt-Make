@@ -182,17 +182,22 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Set npm cache to temp
-      run: |
-        mkdir -p /tmp/npm-cache
-        echo "npm_config_cache=/tmp/npm-cache" >> $GITHUB_ENV
+#    - name: Set npm cache to temp
+#      run: |
+#        mkdir -p /tmp/npm-cache
+#        echo "npm_config_cache=/tmp/npm-cache" >> $GITHUB_ENV
 
-    - name: Pre-build frp (single thread)
+    - name: Fix npm cache permissions
       run: |
-        cd openwrt
-        make -j$(nproc) toolchain/install
-        make -j$(nproc) package/feeds/packages/python3/host/compile
-        make -j1 package/feeds/packages/frp/compile V=s
+        mkdir -p ~/.npm
+        chown -R $(whoami) ~/.npm
+    
+#    - name: Pre-build frp (single thread)
+#      run: |
+#        cd openwrt
+#        make -j$(nproc) toolchain/install
+#        make -j$(nproc) package/feeds/packages/python3/host/compile
+#        make -j1 package/feeds/packages/frp/compile V=s
 
     - name: Compile the firmware
       id: compile
