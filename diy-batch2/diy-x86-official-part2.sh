@@ -232,7 +232,7 @@ for LEDEPACK in $LEDEPACKS; do
     (cd "LEDEPACK/$LEDEPACK" && \
         git sparse-checkout set "package/lean/$LEDEPACK" && \
         mv "package/lean/$LEDEPACK"/* ./ && \
-        rm -rf net .git)
+        rm -rf package .git)
 done
 
 # 6. 创建符号链接到 package/（让 OpenWrt 识别这些包）
