@@ -90,7 +90,7 @@ jobs:
         eval "$send_dingding \"${send_content1}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#6A65FF>${send_content1}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
         
         cd /tmp
-        wget -nc -O test1.file https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/test.file
+        wget -nc -O test1.file https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/tmp/test.file
         cp test1.file test2.file
         cp test1.file test3.file
         cp test1.file test4.file
