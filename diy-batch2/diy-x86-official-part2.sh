@@ -228,10 +228,10 @@ LEDEPACKS="ddns-scripts_aliyun ddns-scripts_dnspod"
 for LEDEPACK in $LEDEPACKS; do
     safe_rm "LEDEPACK/$LEDEPACK"
     git clone --depth=1 --filter=blob:none --sparse -b master \
-        https://github.com/immortalwrt/packages.git "LEDEPACK/$LEDEPACK"
+        https://github.com/coolsnowwolf/lede.git "LEDEPACK/$LEDEPACK"
     (cd "LEDEPACK/$LEDEPACK" && \
         git sparse-checkout set "lean/$LEDEPACK" && \
-        mv "lean/$LEDEPACK"/* ./ && \
+        mv "package/lean/$LEDEPACK"/* ./ && \
         rm -rf net .git)
 done
 
