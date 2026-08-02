@@ -230,7 +230,7 @@ for LEDEPACK in $LEDEPACKS; do
     git clone --depth=1 --filter=blob:none --sparse -b master \
         https://github.com/coolsnowwolf/lede.git "LEDEPACK/$LEDEPACK"
     (cd "LEDEPACK/$LEDEPACK" && \
-        git sparse-checkout set "lean/$LEDEPACK" && \
+        git sparse-checkout set "package/lean/$LEDEPACK" && \
         mv "package/lean/$LEDEPACK"/* ./ && \
         rm -rf net .git)
 done
