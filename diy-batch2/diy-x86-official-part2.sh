@@ -223,24 +223,24 @@ git clone --depth=1 --filter=blob:none --sparse -b master \
     rm -rf package .git)
 
 # 5. LEDE PACK
-# LEDEPACKS="ddns-scripts_aliyun ddns-scripts_dnspod"
+LEDEPACKS="ddns-scripts_aliyun ddns-scripts_dnspod"
 # frp
-# for LEDEPACK in $LEDEPACKS; do
-#    safe_rm "LEDEPACK/$LEDEPACK"
-#    git clone --depth=1 --filter=blob:none --sparse -b master \
-#        https://github.com/coolsnowwolf/lede.git "LEDEPACK/$LEDEPACK"
-#    (cd "LEDEPACK/$LEDEPACK" && \
-#        git sparse-checkout set "package/lean/$LEDEPACK" && \
-#        mv "package/lean/$LEDEPACK"/* ./ && \
-#        rm -rf package .git)
-# done
+for LEDEPACK in $LEDEPACKS; do
+   safe_rm "LEDEPACK/$LEDEPACK"
+   git clone --depth=1 --filter=blob:none --sparse -b master \
+       https://github.com/coolsnowwolf/lede.git "LEDEPACK/$LEDEPACK"
+   (cd "LEDEPACK/$LEDEPACK" && \
+       git sparse-checkout set "package/lean/$LEDEPACK" && \
+       mv "package/lean/$LEDEPACK"/* ./ && \
+       rm -rf package .git)
+done
 
 # 6. 创建符号链接到 package/（让 OpenWrt 识别这些包）
 echo "创建符号链接到 package/ ..."
 mkdir -p package
 
 # 7. 链接所有独立目录下的包到 package/
-for dir in immortalAPP LEDEAPP immortalPACK LEDEQCAPACK; do
+for dir in immortalAPP LEDEAPP immortalPACK LEDEQCAPACK LEDEPACK; do
     if [ -d "$dir" ]; then
         for pkg in $(ls -d "$dir"/*/ 2>/dev/null | xargs -n1 basename); do
             if [ -n "$pkg" ]; then
