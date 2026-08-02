@@ -182,15 +182,15 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-#    - name: Set npm cache to temp
-#      run: |
-#        mkdir -p /tmp/npm-cache
-#        echo "npm_config_cache=/tmp/npm-cache" >> $GITHUB_ENV
-
-    - name: Fix npm cache permissions
+    - name: Set npm cache to temp
       run: |
-        mkdir -p ~/.npm
-        chown -R $(whoami) ~/.npm
+        mkdir -p /tmp/npm-cache
+        echo "npm_config_cache=/tmp/npm-cache" >> $GITHUB_ENV
+
+#    - name: Fix npm cache permissions
+#      run: |
+#        mkdir -p ~/.npm
+#        chown -R $(whoami) ~/.npm
     
 #    - name: Pre-build frp (single thread)
 #      run: |
