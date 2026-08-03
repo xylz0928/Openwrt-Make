@@ -136,6 +136,9 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git ./package/luci-theme
 #git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git ./package/luci-theme-argon
 git clone https://github.com/jerrykuku/luci-app-argon-config.git ./package/luci-app-argon-config
 
+# Add Zargon Theme
+git clone --depth 1 https://github.com/zzsj0928/luci-theme-zargon package/luci-theme-zargon
+
 # Change default BackGround img
 # rm ./package/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg
 wget -O ./package/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg https://github.com/xylz0928/luci-mod/raw/main/Background/MontereyDark.jpg
