@@ -137,7 +137,13 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git ./package/luci-theme
 git clone https://github.com/jerrykuku/luci-app-argon-config.git ./package/luci-app-argon-config
 
 # Add Zargon Theme
-git clone --depth 1 https://github.com/zzsj0928/luci-theme-zargon package/luci-theme-zargon
+# git clone --depth 1 https://github.com/zzsj0928/luci-theme-zargon package/luci-theme-zargon
+
+# Add Liquid Theme
+git clone --depth 1 https://github.com/zzsj0928/luci-theme-liquid package/luci-theme-liquid
+
+# Change default theme
+sed -i 's/bootstrap/liquid/g' feeds/luci/collections/luci/Makefile
 
 # Change default BackGround img
 # rm ./package/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg
@@ -154,9 +160,6 @@ git pull origin immortalwrt-24.10
 cd ../../
 
 mv package/lucimod/feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons/* feeds/luci/modules/luci-base/htdocs/luci-static/resources/icons/
-
-# Change default theme
-sed -i 's/bootstrap/argon/g' feeds/luci/collections/luci/Makefile
 
 # Modify default IP
 # sed -i 's/192.168.1.1/192.168.100.1/g' package/base-files/files/bin/config_generate
