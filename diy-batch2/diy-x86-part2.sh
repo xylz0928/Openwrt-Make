@@ -285,6 +285,12 @@ git clone https://github.com/sirpdboy/luci-app-advanced package/luci-app-advance
 # Add luci-app-netspeedtest
 git clone https://github.com/sirpdboy/netspeedtest package/netspeedtest
 
+# Add Bandix
+git clone https://github.com/timsaya/luci-app-bandix package/luci-app-bandix
+git clone https://github.com/timsaya/openwrt-bandix package/openwrt-bandix
+# git clone https://github.com/timsaya/luci-app-bandix-plus package/luci-app-bandix-plus
+# git clone https://github.com/timsaya/openwrt-bandix-plus package/openwrt-bandix-plus
+
 # Add SmartDNS
 # rm -rf ./feeds/packages/net/smartdns
 # svn co https://github.com/sirpdboy/sirpdboy-package/trunk/luci-app-smartdns ./package/luci-app-smartdns
