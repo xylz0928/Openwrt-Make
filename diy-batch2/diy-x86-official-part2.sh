@@ -138,6 +138,12 @@ git clone https://github.com/chenmozhijin/luci-app-socat package/luci-app-socat
 # Add luci-app-advanced
 git clone https://github.com/sirpdboy/luci-app-advanced package/luci-app-advanced
 
+# Add Bandix
+git clone https://github.com/timsaya/luci-app-bandix package/luci-app-bandix
+git clone https://github.com/timsaya/openwrt-bandix package/openwrt-bandix
+# git clone https://github.com/timsaya/luci-app-bandix-plus package/luci-app-bandix-plus
+# git clone https://github.com/timsaya/openwrt-bandix-plus package/openwrt-bandix-plus
+
 # Add luci-app-netspeedtest
 git clone https://github.com/sirpdboy/netspeedtest package/netspeedtest
 
