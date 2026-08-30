@@ -196,9 +196,9 @@ done
 
 # rm -rf feeds/packages/net/ddns-scripts
 # rm -rf feeds/packages/net/frp
-rm -rf feeds/packages/net/sing-box
+#rm -rf feeds/packages/net/sing-box
 # 2. ImmortalWrt 软件包（vlmcsd）
-immortalPACKS="vlmcsd sing-box"
+immortalPACKS="vlmcsd"
 # frp ddns-scripts
 for immortalPACK in $immortalPACKS; do
     safe_rm "immortalPACK/$immortalPACK"
