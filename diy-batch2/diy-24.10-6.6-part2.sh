@@ -348,9 +348,29 @@ git clone https://github.com/EasyTier/luci-app-easytier package/luci-app-easytie
 
 # Add 360 T7 108M
 wget -O "target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts" "https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/target/linux/mediatek/dts/mt7981b-qihoo-360t7-108M.dts"
-wget -O "target/linux/mediatek/image/filogic.mk" "https://github.com/xylz0928/Openwrt-Make/raw/refs/heads/main/target/linux/mediatek/image/filogic.mk"
 
-sed -i 's/  DEVICE_DTS := mt7981b-qihoo-360t7-108M/  DEVICE_DTS := mt7981b-qihoo-360t7-108M\n  SUPPORTED_DEVICES := qihoo,360t7,108M/' target/linux/mediatek/image/filogic.mk
+# 注意：不要再整份覆盖上游 filogic.mk（旧快照会引用上游已删除的 dts，
+# 例如 mt7986a-clx-s20p.dts，导致 target/linux/install 编译失败）。
+# 改为把 108M 自定义设备追加到当次克隆的上游 filogic.mk 末尾。
+cat >> "target/linux/mediatek/image/filogic.mk" <<'EOF'
+
+define Device/qihoo_360t7_108M
+  DEVICE_VENDOR := Qihoo
+  DEVICE_MODEL := 360 T7 (with 108M ubi)
+  DEVICE_DTS := mt7981b-qihoo-360t7-108M
+  DEVICE_DTS_DIR := ../dts
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 110592k
+  KERNEL_IN_UBI := 1
+  SUPPORTED_DEVICES := qihoo,360t7,108M
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += qihoo_360t7_108M
+EOF
 
 # Add Zerotier
 rm -rf feeds/luci/applications/luci-app-zerotier
