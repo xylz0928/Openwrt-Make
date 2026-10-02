@@ -1,0 +1,331 @@
+#!/bin/sh
+# zed-opota —— 官方 x86 固件 OTA 核心
+#
+# 用法: zed-opota <check|space <bytes>|download <bytes>|progress|install|clean <target>>
+#
+# 设计约束（对应需求 1.2 / 2.2 / 2.3）：
+#  - 不做任何更新缓存：check 每次实时请求 GitHub API
+#  - 下载前强制 tmpfs 空间检查：固件体积 + 当前配置备份体积 + 4MB 余量
+#  - 刷机前强制 sha256 校验，失败删除产物并明确报"下载成功但固件校验失败"
+#  - 清理目标白名单（smart/udpxy），且用"原地清零"而非 rm：
+#    实机确认 clash / udpxy 均持有文件句柄，rm 不释放空间，truncate 才释放
+#
+# stdout 只输出 JSON；进度/状态落盘 /tmp/zzota/（瞬态下载状态，非更新缓存）
+
+set -u
+
+# OPOTA_* 仅用于本地单元测试/调试覆盖，设备端（uhttpd popen）环境固定为默认值
+WORK=${OPOTA_WORK:-/tmp/zzota}
+RELEASE_FILE=${OPOTA_RELEASE_FILE:-/etc/openwrt_release}
+SMART_FILE=${OPOTA_SMART_FILE:-/etc/openclash/smart_weight_data.csv}
+UDPXY_FILE=${OPOTA_UDPXY_FILE:-/tmp/log/udpxy}
+REPO="xylz0928/Openwrt-Make"
+IMG="openwrt-x86-64-generic-squashfs-combined-efi.img.gz"
+API="https://api.github.com/repos/${REPO}/releases/latest"
+MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
+
+mkdir -p "$WORK"
+
+# ---------- JSON 输出辅助 ----------
+jesc() {
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+# 拼接所有参数后输出一行（JSON 片段间的空格合法）
+emit() {
+	printf '%s\n' "$*"
+}
+
+# fail "消息" ["额外的JSON键值对"]
+fail() {
+	local msg extra
+	msg=$(jesc "$1")
+	extra=""
+	[ $# -gt 1 ] && extra=",$2"
+	emit "{\"ok\":false,\"error\":\"${msg}\"${extra}}"
+	exit 0
+}
+
+# ---------- 数据源 ----------
+local_ver() {
+	grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' "$RELEASE_FILE" 2>/dev/null | head -n1
+}
+
+release_json() {
+	curl -sS --max-time 10 \
+		-H 'Accept: application/vnd.github+json' \
+		-H 'User-Agent: zed-opota' \
+		"$API" 2>/dev/null
+}
+
+# 取远端最新 release 的 tag（stdout），失败返回 1
+get_remote() {
+	local tag
+	tag=$(release_json | jsonfilter -e '@.tag_name' 2>/dev/null)
+	[ -n "$tag" ] || return 1
+	printf '%s' "$tag"
+}
+
+# HEAD 获取远端固件字节数（stdout 数字），失败输出 0
+remote_size() {
+	local cl
+	cl=$(curl -sIL --max-time 15 "$1" 2>/dev/null | tr -d '\r' \
+		| grep -i '^content-length:' | tail -n1 | tr -dc '0-9')
+	printf '%s' "${cl:-0}"
+}
+
+tmp_free() {
+	df -k /tmp | awk 'NR==2 {print $4 * 1024}' | tr -dc '0-9'
+}
+
+tmp_total() {
+	df -k /tmp | awk 'NR==2 {print $2 * 1024}' | tr -dc '0-9'
+}
+
+# 当前配置备份体积（字节）：sysupgrade -b 实测，失败回退 du 估算
+cfg_size() {
+	local n
+	if sysupgrade -b "$WORK/cfg.tgz" >/dev/null 2>&1 && [ -s "$WORK/cfg.tgz" ]; then
+		n=$(wc -c < "$WORK/cfg.tgz" | tr -dc '0-9')
+		rm -f "$WORK/cfg.tgz"
+		printf '%s' "${n:-0}"
+		return
+	fi
+	rm -f "$WORK/cfg.tgz"
+	n=$(du -sk /etc/config 2>/dev/null | awk '{print $1 * 1024}' | tr -dc '0-9')
+	printf '%s' "${n:-0}"
+}
+
+stage_get() {
+	cat "$WORK/stage" 2>/dev/null || printf 'idle'
+}
+
+err_get() {
+	cat "$WORK/err" 2>/dev/null
+}
+
+# ---------- 核心校验（download 后台流程与 install 前各调用一次） ----------
+# 返回 0 = 匹配；1 = 不匹配/缺文件
+verify_core() {
+	local want got
+	[ -f "$WORK/$IMG" ] && [ -f "$WORK/sha256sums" ] || return 1
+	want=$(awk -v f="$IMG" '
+		{
+			name = $2; sub(/^\*/, "", name);
+			if (name == f) { print $1; exit }
+		}' "$WORK/sha256sums")
+	[ -n "$want" ] || return 1
+	got=$(sha256sum "$WORK/$IMG" | awk '{print $1}')
+	[ "$want" = "$got" ]
+}
+
+# ---------- 子命令 ----------
+do_check() {
+	local local_v json tag tag_v size pub img_url sha_url upd
+	local_v=$(local_ver)
+	[ -n "$local_v" ] || fail "无法读取本地固件版本"
+
+	json=$(release_json)
+	tag=$(printf '%s' "$json" | jsonfilter -e '@.tag_name' 2>/dev/null)
+	[ -n "$tag" ] || fail "无法获取远端版本（GitHub API 不可达）"
+
+	tag_v=$(printf '%s' "$tag" | grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
+	[ -n "$tag_v" ] || fail "远端 tag 缺少版本日期"
+
+	img_url="https://github.com/${REPO}/releases/download/${tag}/${IMG}"
+	sha_url="https://github.com/${REPO}/releases/download/${tag}/sha256sums"
+	size=$(remote_size "$img_url")
+	case "$size" in ''|*[!0-9]*) size=0 ;; esac
+
+	# yyyy-mm-dd 字典序即时间序
+	upd=false
+	[ "$tag_v" \> "$local_v" ] && upd=true
+
+	# 远端不比本地新：清理本地残留下载（避免占 tmpfs / 用旧产物误刷）
+	if [ "$upd" = false ]; then
+		rm -f "$WORK/$IMG" "$WORK/$IMG.part" "$WORK/sha256sums" \
+			"$WORK/stage" "$WORK/err" "$WORK/expected"
+	fi
+
+	pub=$(printf '%s' "$json" | jsonfilter -e '@.published_at' 2>/dev/null)
+	pub=${pub:-""}
+
+	emit "{\"ok\":true,\"local\":\"${local_v}\",\"remote\":\"${tag_v}\"," \
+		"\"tag\":\"$(jesc "$tag")\",\"has_update\":${upd}," \
+		"\"size\":${size},\"img_url\":\"${img_url}\",\"sha_url\":\"${sha_url}\"," \
+		"\"published\":\"$(jesc "$pub")\"}"
+}
+
+do_space() {
+	local fw cfg need free total enough
+	fw=${1:-0}
+	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
+
+	cfg=$(cfg_size)
+	free=$(tmp_free)
+	total=$(tmp_total)
+	need=$((fw + cfg + MARGIN))
+	enough=false
+	[ "$free" -ge "$need" ] && enough=true
+
+	emit "{\"ok\":true,\"fw\":${fw},\"cfg\":${cfg},\"margin\":${MARGIN}," \
+		"\"need\":${need},\"free\":${free},\"total\":${total},\"enough\":${enough}}"
+}
+
+do_download() {
+	local fw cfg free total need tag img_url sha_url stage
+	fw=${1:-0}
+	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
+
+	stage=$(stage_get)
+	[ "$stage" = "downloading" ] && fail "固件正在下载中"
+
+	# 下载前强制空间检查（需求 2.3）
+	if [ "$fw" -eq 0 ]; then
+		tag=$(get_remote) || fail "无法获取远端版本，无法执行空间检查"
+		img_url="https://github.com/${REPO}/releases/download/${tag}/${IMG}"
+		fw=$(remote_size "$img_url")
+		case "$fw" in ''|*[!0-9]*) fw=0 ;; esac
+		[ "$fw" -gt 0 ] || fail "无法获取固件体积，无法执行空间检查"
+	fi
+	cfg=$(cfg_size)
+	free=$(tmp_free)
+	total=$(tmp_total)
+	need=$((fw + cfg + MARGIN))
+	if [ "$free" -lt "$need" ]; then
+		emit "{\"ok\":false,\"error\":\"tmpfs 空间不足，无法下载固件\"," \
+			"\"code\":\"space\",\"fw\":${fw},\"cfg\":${cfg},\"margin\":${MARGIN}," \
+			"\"need\":${need},\"free\":${free},\"total\":${total}}"
+		exit 0
+	fi
+
+	# 远端地址实时解析（不缓存）
+	tag=$(get_remote) || fail "无法获取远端版本（GitHub API 不可达）"
+	img_url="https://github.com/${REPO}/releases/download/${tag}/${IMG}"
+	sha_url="https://github.com/${REPO}/releases/download/${tag}/sha256sums"
+
+	rm -f "$WORK/$IMG" "$WORK/$IMG.part" "$WORK/sha256sums" "$WORK/err"
+	printf '%s' "$fw" > "$WORK/expected"
+	echo downloading > "$WORK/stage"
+
+	# 后台下载 + 自动校验（liquid/pushbot 同款"子 shell &"模式，不阻塞 rpcd）
+	(
+		if ! curl -fsSL --retry 3 --max-time 600 -o "$WORK/sha256sums" "$sha_url"; then
+			echo "sha256sums 下载失败" > "$WORK/err"
+			echo failed > "$WORK/stage"
+			exit 1
+		fi
+		if ! curl -fL --retry 3 --max-time 1800 -o "$WORK/$IMG.part" "$img_url"; then
+			echo "固件下载失败" > "$WORK/err"
+			echo failed > "$WORK/stage"
+			exit 1
+		fi
+		mv "$WORK/$IMG.part" "$WORK/$IMG"
+		echo verifying > "$WORK/stage"
+		if verify_core; then
+			echo ready > "$WORK/stage"
+		else
+			echo "下载成功但固件校验失败" > "$WORK/err"
+			rm -f "$WORK/$IMG" "$WORK/sha256sums"
+			echo failed > "$WORK/stage"
+		fi
+	) >> "$WORK/dl.log" 2>&1 &
+
+	emit "{\"ok\":true,\"stage\":\"downloading\"}"
+}
+
+do_progress() {
+	local stage got total percent
+	stage=$(stage_get)
+	got=0
+	[ -f "$WORK/$IMG.part" ] && got=$(wc -c < "$WORK/$IMG.part" | tr -dc '0-9')
+	if [ "$got" -eq 0 ] && [ -f "$WORK/$IMG" ]; then
+		got=$(wc -c < "$WORK/$IMG" | tr -dc '0-9')
+	fi
+	total=$(cat "$WORK/expected" 2>/dev/null | tr -dc '0-9')
+	total=${total:-0}
+	percent=0
+	if [ "$total" -gt 0 ] && [ "$got" -gt 0 ]; then
+		percent=$((got * 100 / total))
+		[ "$percent" -gt 100 ] && percent=100
+	fi
+	[ "$stage" = "ready" ] && percent=100
+
+	emit "{\"ok\":true,\"stage\":\"${stage}\",\"got\":${got},\"total\":${total}," \
+		"\"percent\":${percent},\"error\":\"$(jesc "$(err_get)")\"}"
+}
+
+do_install() {
+	local test_out
+	[ -f "$WORK/$IMG" ] || fail "没有已下载的固件"
+
+	# 需求 2.2：执行更新前再次校验，不匹配则删除产物并明确提示
+	if ! verify_core; then
+		rm -f "$WORK/$IMG" "$WORK/sha256sums"
+		echo "下载成功但固件校验失败" > "$WORK/err"
+		echo failed > "$WORK/stage"
+		fail "下载成功但固件校验失败，已删除固件产物"
+	fi
+
+	# 与官方 flash 页一致：先 --test 平台校验
+	if ! test_out=$(sysupgrade --test "$WORK/$IMG" 2>&1); then
+		printf '%s\n' "$test_out" > "$WORK/install.log"
+		fail "sysupgrade 镜像校验未通过，未执行刷机"
+	fi
+
+	echo installing > "$WORK/stage"
+	(
+		sysupgrade -v "$WORK/$IMG" > "$WORK/install.log" 2>&1
+	) &
+	emit "{\"ok\":true,\"stage\":\"installing\"}"
+}
+
+do_clean() {
+	local f name sz
+	case "${1:-}" in
+	smart)
+		f=$SMART_FILE
+		name="OpenClash Smart 缓存"
+		;;
+	udpxy)
+		f=$UDPXY_FILE
+		name="udpxy 缓存"
+		;;
+	*)
+		fail "未知清理目标"
+		;;
+	esac
+
+	if [ ! -e "$f" ]; then
+		emit "{\"ok\":true,\"freed\":0,\"target\":\"$(jesc "$1")\"," \
+			"\"msg\":\"${name} 不存在，已干净\"}"
+		exit 0
+	fi
+
+	sz=$(wc -c < "$f" | tr -dc '0-9')
+	sz=${sz:-0}
+
+	# 关键：进程（clash / udpxy）持有句柄，rm 不释放空间 —— 原地清零截断
+	if : > "$f" 2>/dev/null; then
+		emit "{\"ok\":true,\"freed\":${sz},\"target\":\"$(jesc "$1")\"," \
+			"\"msg\":\"${name} 已清空（原 ${sz} 字节），无需重启进程\"}"
+	else
+		fail "${name} 清空失败（权限不足或文件系统只读）"
+	fi
+}
+
+# ---------- 入口 ----------
+cmd=${1:-}
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+check)		do_check ;;
+space)		do_space "${1:-0}" ;;
+download)	do_download "${1:-0}" ;;
+progress)	do_progress ;;
+install)	do_install ;;
+clean)		do_clean "${1:-}" ;;
+*)
+	emit '{"ok":false,"error":"用法: zed-opota check|space|download|progress|install|clean"}'
+	;;
+esac

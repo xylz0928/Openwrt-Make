@@ -296,4 +296,33 @@ done
 # git clone https://github.com/nikkinikki-org/OpenWrt-nikki.git package/OpenWrt-nikki
 #----------------------------------------------#
 
+#----------------------------------------------#
+# Add 在线升级 OTA（旁挂独立包，不改任何上游文件）
+#   Actions 场景：仓库整体检出，直接本地复制
+#   AllinOne 场景：只 wget 了本脚本，回退从 GitHub 归档取包
+#----------------------------------------------#
+OTA_PKG=luci-app-zed-opota
+REPO_ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
+mkdir -p package
+if [ -d "$REPO_ROOT/package/$OTA_PKG" ]; then
+	cp -r "$REPO_ROOT/package/$OTA_PKG" package/
+elif [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE/package/$OTA_PKG" ]; then
+	cp -r "$GITHUB_WORKSPACE/package/$OTA_PKG" package/
+else
+	echo "==> 本地未找到 $OTA_PKG，从 GitHub 归档获取"
+	wget -qO /tmp/opota.tar.gz \
+		"https://github.com/xylz0928/Openwrt-Make/archive/refs/heads/main.tar.gz" &&
+		tar -xzf /tmp/opota.tar.gz -C /tmp "Openwrt-Make-main/package/$OTA_PKG" &&
+		cp -r "/tmp/Openwrt-Make-main/package/$OTA_PKG" package/ &&
+		rm -rf /tmp/Openwrt-Make-main /tmp/opota.tar.gz ||
+		{ echo "错误：获取 $OTA_PKG 失败，OTA 将不可用"; exit 1; }
+fi
+# 复制结果校验：包结构必须完整（Makefile 缺失即失败，避免静默出无 OTA 的固件）
+[ -f "package/$OTA_PKG/Makefile" ] ||
+	{ echo "错误：$OTA_PKG 复制不完整（缺 Makefile），构建终止"; exit 1; }
+# 确保 .config 启用（MakeMenu.x86-official.config 已含此行时幂等）
+grep -q '^CONFIG_PACKAGE_luci-app-zed-opota=y' .config 2>/dev/null ||
+	echo 'CONFIG_PACKAGE_luci-app-zed-opota=y' >> .config
+echo "==> $OTA_PKG 已就位"
+
 

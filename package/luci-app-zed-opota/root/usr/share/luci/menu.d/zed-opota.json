@@ -1,0 +1,52 @@
+{
+	"admin/system/opota": {
+		"title": "在线升级 OTA",
+		"order": 71,
+		"action": {
+			"type": "view",
+			"path": "system/opota"
+		}
+	},
+	"admin/system/opota/check": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_check"
+		}
+	},
+	"admin/system/opota/space": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_space"
+		}
+	},
+	"admin/system/opota/download": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_download"
+		}
+	},
+	"admin/system/opota/progress": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_progress"
+		}
+	},
+	"admin/system/opota/install": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_install"
+		}
+	},
+	"admin/system/opota/clean": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_clean"
+		}
+	}
+}
