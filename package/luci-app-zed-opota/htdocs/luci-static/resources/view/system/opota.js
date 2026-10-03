@@ -115,10 +115,12 @@ function api(name, params, timeoutMs) {
 			.catch(function(e) {
 				clearTimeout(timer);
 				if (e && e.name === 'AbortError') {
-					var te = new Error('请求超时（>' + t + 's 未收到响应；服务端日志可对照是否实际完成）');
-					te.kind = 'timeout';
-					reject(te);
-				} else reject(e);
+					e = new Error('请求超时（>' + t + 's 未收到响应；服务端日志可对照是否实际完成）');
+					e.kind = 'timeout';
+				}
+				if (e && typeof e.message === 'string' && e.message.indexOf('URL:') < 0)
+					e.message += '（URL: ' + location.origin + url + '）';
+				reject(e);
 			});
 	});
 }
@@ -230,8 +232,10 @@ return view.extend({
 			])
 		]);
 
+		/* 页面加载即自检后端（auth/路由问题无需点按钮即可见） */
+		setTimeout(function() { self.selfProbe(); }, 250);
 		/* 页面加载/刷新后恢复未完成的下载状态 */
-		setTimeout(function() { self.restoreState(); }, 300);
+		setTimeout(function() { self.restoreState(); }, 400);
 
 		return node;
 	},
@@ -573,6 +577,20 @@ return view.extend({
 			self.setBusy(false);
 			self.setStatus('err', '刷机未启动');
 			self.showResult('刷机未启动：' + ((e && e.message) || '未知错误'), 'err');
+		});
+	},
+
+	/* 页面加载自检：探测一次最轻量的 progress，失败即完整诊断 */
+	selfProbe: function() {
+		var self = this;
+		api('progress', null, 10000).then(function() {
+			/* 通了就不打扰 */
+		}).catch(function(e) {
+			self.setStatus('err', '后端自检失败');
+			self.showResult('页面加载自检未通过：\n'
+				+ ((e && e.message) || '未知错误')
+				+ '\n—— 上面已含完整请求 URL。若含 HTTP403：会话无效，请退出重新登录 LuCI；'
+				+ '若含 HTTP404：服务端菜单树陈旧，请联系维护者重启 uwsgi 后重试。', 'err');
 		});
 	},
 
