@@ -185,7 +185,7 @@ return view.extend({
 
 		dom.append(window.document.head, E('style', { 'type': 'text/css' }, CSS));
 
-		var msg = E('div', { 'class': 'opota-msg', 'id': 'opota-msg' }, ['点击"检查更新"查询最新固件']);
+		var msg = E('div', { 'class': 'opota-msg', 'id': 'opota-msg' }, ['请选择固件源开始检查更新']);
 		var sub = E('div', { 'class': 'opota-sub', 'id': 'opota-sub' });
 		var sources = E('div', { 'class': 'opota-sources', 'id': 'opota-sources' });
 		var result = E('div', { 'class': 'opota-result', 'id': 'opota-result' });
@@ -193,16 +193,16 @@ return view.extend({
 		/* 固件源前台单选：默认 Zed-Github */
 		var chipGh = E('label', { 'class': 'opota-chip on', 'id': 'opota-chip-gh' }, [
 			E('input', { type: 'radio', name: 'opota-source', id: 'opota-src-github', 'checked': true,
-				'change': function() { self.onSourceChange(); } }),
+				'click': function() { self.onSourceChange(); } }),
 			'Zed-Github'
 		]);
 		var chipNas = E('label', { 'class': 'opota-chip', 'id': 'opota-chip-nas' }, [
 			E('input', { type: 'radio', name: 'opota-source', id: 'opota-src-nas',
-				'change': function() { self.onSourceChange(); } }),
+				'click': function() { self.onSourceChange(); } }),
 			'Zed-NAS'
 		]);
 		var srcPick = E('div', { 'class': 'opota-srcpick' }, [
-			E('span', {}, ['固件源：']), chipGh, chipNas
+			E('span', {}, ['检查更新：']), chipGh, chipNas
 		]);
 
 		function mkBtn(text, cls, handler) {
@@ -210,7 +210,6 @@ return view.extend({
 				'click': handler }, [text]);
 		}
 
-		var btnCheck = mkBtn('检查更新', 'important', function() { self.doCheck(); });
 		var btnSpace = mkBtn('检查tmpfs剩余空间', '', function() { self.doSpace(); });
 		var btnSmart = mkBtn('清理OpenClash Smart缓存', '', function() {
 			self.doClean('smart', 'OpenClash Smart 缓存');
@@ -233,7 +232,7 @@ return view.extend({
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
 			msg, sub, sources, srcPick, result,
 			E('div', { 'class': 'opota-btn-row' },
-				[btnCheck, btnSpace, btnSmart, btnUdpxy, btnLog]),
+				[btnSpace, btnSmart, btnUdpxy, btnLog]),
 			updateRow
 		]);
 
@@ -309,13 +308,14 @@ return view.extend({
 		if (row) row.className = 'opota-btn-row' + (show ? '' : ' hidden');
 	},
 
-	/* 切换固件源：若已检查过，自动重查使卡片与所选源一致 */
+	/* 点击固件源 = 检查更新（该行标签即"检查更新"，无独立按钮） */
 	onSourceChange: function() {
+		if (busy) return;   /* 检查中点击：连选中视觉都不改，防状态错位 */
 		document.querySelectorAll('#zed-opota .opota-chip').forEach(function(c) {
 			var input = c.querySelector('input');
 			c.className = 'opota-chip' + (input && input.checked ? ' on' : '');
 		});
-		if (lastCheck && !busy) this.doCheck();
+		this.doCheck();
 	},
 
 	/* ── 动作 ── */
