@@ -14,6 +14,7 @@
 
 var lastCheck = null;	/* 最近一次 check 结果 */
 var autoFlash = false;	/* 立即更新=校验通过后自动进入刷机；拉取更新=false */
+var lastStatusKind = null;	/* 状态种类：同状态轮询不重播弹出动画（防闪烁） */
 var pollTimer = null;
 var busy = false;
 
@@ -283,22 +284,43 @@ return view.extend({
 	/* ── UI 状态 ── */
 	setStatus: function(kind, text) {
 		var card = $('opota-card');
+		var same = (kind === lastStatusKind);
 		if (card) {
 			card.className = 'opota-card' + (kind ? ' is-' + kind : '');
-			/* 触发弹出动画 */
-			card.classList.remove('opota-anim');
-			void card.offsetWidth;
-			card.classList.add('opota-anim');
+			/* 仅状态【切换】时播弹出动画——轮询刷新同一状态不重播（防闪烁） */
+			if (!same) {
+				card.classList.remove('opota-anim');
+				void card.offsetWidth;
+				card.classList.add('opota-anim');
+			}
 		}
+		lastStatusKind = kind;
 		var m = $('opota-msg');
 		if (m) m.innerHTML = text == null ? '' : esc(text);
 	},
 
-	/* msg 行带圆环（检查中=旋转；下载/校验=带百分比） */
+	/* msg 行带圆环（检查中=旋转；下载/校验=带百分比）。
+	   下载进度每秒轮询：同状态走"原地更新"路径，只改 dasharray 与文字，
+	   不重建 SVG、不重播动画——消除闪烁 */
 	setStatusRing: function(kind, text, pct) {
-		this.setStatus(kind, null);
 		var m = $('opota-msg');
-		if (m) m.innerHTML = ringHtml(pct == null ? null : pct) + '<span>' + esc(text) + '</span>';
+		var dash = (pct == null) ? '25,100' : (Math.max(0, Math.min(100, pct)) + ',100');
+		if (m && lastStatusKind === kind) {
+			var wrap = m.querySelector('.opota-ring');
+			var fg = m.querySelector('.opota-ring-fg');
+			if (wrap && fg) {
+				fg.style.strokeDasharray = dash;
+				if (pct == null) wrap.classList.add('spin');
+				else wrap.classList.remove('spin');
+				var spans = m.querySelectorAll('span');
+				if (spans.length) spans[spans.length - 1].textContent = text;
+				else m.insertAdjacentHTML('beforeend', '<span>' + esc(text) + '</span>');
+				return;
+			}
+		}
+		this.setStatus(kind, null);
+		var m2 = $('opota-msg');
+		if (m2) m2.innerHTML = ringHtml(pct == null ? null : pct) + '<span>' + esc(text) + '</span>';
 	},
 
 	setSub: function(text) {
