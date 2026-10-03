@@ -183,7 +183,7 @@ verify_core() {
 # ---------- 子命令 ----------
 # do_check [source]：source=前台所选源（github=Zed-Github | static=Zed-NAS，默认 github），白名单
 do_check() {
-	local local_v sel gh_ok st_ok selected_ok upd asset img_url sha_url size
+	local local_v sel gh_ok st_ok gh_checked st_checked selected_ok upd asset img_url sha_url size
 	local_v=$(local_ver)
 	[ -n "$local_v" ] || fail "无法读取本地固件版本"
 
@@ -192,16 +192,18 @@ do_check() {
 	*) sel=github ;;
 	esac
 
+	# 只探测所选源（点哪个查哪个），另一源标记为未检测
 	gh_ok=false; st_ok=false
-	if gh_probe; then gh_ok=true; fi
-	if static_probe; then st_ok=true; fi
-
-	if [ "$gh_ok" = false ] && [ "$st_ok" = false ]; then
-		log_line "检查更新[$sel]：双源均不可达（本地 ${local_v:-?}）"
-		fail "Zed-Github 与 Zed-NAS 均不可达（网络异常或 API 限流）"
+	gh_checked=false; st_checked=false
+	if [ "$sel" = github ]; then
+		gh_checked=true
+		if gh_probe; then gh_ok=true; fi
+	else
+		st_checked=true
+		if static_probe; then st_ok=true; fi
 	fi
 
-	# 源由前台选择：selected_ok=所选源是否可达；不可达则不给 URL、不动本地产物
+	# selected_ok=所选源是否可达；不可达则不给 URL、不动本地产物
 	selected_ok=false
 	asset=""; img_url=""; sha_url=""; size=0; upd=false
 	if [ "$sel" = github ] && [ "$gh_ok" = true ]; then
@@ -240,10 +242,10 @@ do_check() {
 	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${sel}\"," \
 		"\"selected_ok\":${selected_ok},\"has_update\":${upd}," \
 		"\"sources\":{" \
-		"\"github\":{\"ok\":${gh_ok},\"version\":\"$(jesc "${GH_DATE:-}")\"," \
+		"\"github\":{\"ok\":${gh_ok},\"checked\":${gh_checked},\"version\":\"$(jesc "${GH_DATE:-}")\"," \
 		"\"tag\":\"$(jesc "${GH_TAG:-}")\",\"size\":${GH_SIZE:-0}," \
 		"\"published\":\"$(jesc "${GH_PUB:-}")\"}," \
-		"\"static\":{\"ok\":${st_ok},\"version\":\"$(jesc "${ST_DATE:-}")\"," \
+		"\"static\":{\"ok\":${st_ok},\"checked\":${st_checked},\"version\":\"$(jesc "${ST_DATE:-}")\"," \
 		"\"size\":${ST_SIZE:-0}}}," \
 		"\"img_url\":\"$(jesc "$img_url")\",\"sha_url\":\"$(jesc "$sha_url")\"," \
 		"\"asset\":\"$(jesc "$asset")\",\"size\":${size}}"

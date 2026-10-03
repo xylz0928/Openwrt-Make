@@ -244,10 +244,12 @@ return view.extend({
 			])
 		]);
 
-		/* 页面加载即自检后端（auth/路由问题无需点按钮即可见） */
-		setTimeout(function() { self.selfProbe(); }, 250);
-		/* 页面加载/刷新后恢复未完成的下载状态 */
-		setTimeout(function() { self.restoreState(); }, 400);
+		/* 进入页面默认自动检查 GitHub 源（所选源未变时即 GitHub；用户抢点则跳过） */
+		setTimeout(function() {
+			if (!lastCheck && !busy && selectedSource() === 'github') self.doCheck();
+		}, 300);
+		/* 恢复未完成的下载状态（排在自动检查之后，就绪态优先展示） */
+		setTimeout(function() { self.restoreState(); }, 600);
 
 		return node;
 	},
@@ -344,16 +346,20 @@ return view.extend({
 			if (srcEl) {
 				var rows = [];
 				rows.push('本地版本：' + esc(d.local) + '　所选源：' + srcLabel(d.active));
-				rows.push('Zed-Github：' + (gh.ok
-					? '<span class="src-ok">✓ 可达</span>　' + esc(gh.version || '-')
-						+ (gh.tag ? '　' + esc(gh.tag) : '')
-						+ (gh.published ? '　' + esc(gh.published) : '')
-						+ (gh.size ? '　' + fmtBytes(gh.size) : '')
-					: '<span class="src-bad">✗ 不可达</span>'));
-				rows.push('Zed-NAS：' + (st.ok
-					? '<span class="src-ok">✓ 可达</span>　最新版本 <b>' + esc(st.version || '-')
-						+ '</b>' + (st.size ? '　' + fmtBytes(st.size) : '')
-					: '<span class="src-bad">✗ 不可达</span>'));
+				rows.push('Zed-Github：' + (!gh.checked
+					? '<span style="opacity:.75">本次未检测（点击该源即查询）</span>'
+					: (gh.ok
+						? '<span class="src-ok">✓ 可达</span>　' + esc(gh.version || '-')
+							+ (gh.tag ? '　' + esc(gh.tag) : '')
+							+ (gh.published ? '　' + esc(gh.published) : '')
+							+ (gh.size ? '　' + fmtBytes(gh.size) : '')
+						: '<span class="src-bad">✗ 不可达</span>')));
+				rows.push('Zed-NAS：' + (!st.checked
+					? '<span style="opacity:.75">本次未检测（点击该源即查询）</span>'
+					: (st.ok
+						? '<span class="src-ok">✓ 可达</span>　最新版本 <b>' + esc(st.version || '-')
+							+ '</b>' + (st.size ? '　' + fmtBytes(st.size) : '')
+						: '<span class="src-bad">✗ 不可达</span>')));
 				srcEl.innerHTML = rows.map(function(x) { return '<div>' + x + '</div>'; }).join('');
 			}
 
@@ -403,7 +409,8 @@ return view.extend({
 		}).catch(function(e) {
 			self.setBusy(false);
 			self.setStatus('err', '检查失败');
-			self.showResult('检查更新失败：' + ((e && e.message) || '未知错误'), 'err');
+			self.showResult('检查更新失败：' + ((e && e.message) || '未知错误')
+				+ '\n—— 若含 HTTP403：会话无效，请重新登录 LuCI；若含 HTTP404：服务端菜单树陈旧，需重启 uwsgi。', 'err');
 		});
 	},
 
@@ -597,20 +604,6 @@ return view.extend({
 			self.setBusy(false);
 			self.setStatus('err', '刷机未启动');
 			self.showResult('刷机未启动：' + ((e && e.message) || '未知错误'), 'err');
-		});
-	},
-
-	/* 页面加载自检：探测一次最轻量的 progress，失败即完整诊断 */
-	selfProbe: function() {
-		var self = this;
-		api('progress', null, 10000).then(function() {
-			/* 通了就不打扰 */
-		}).catch(function(e) {
-			self.setStatus('err', '后端自检失败');
-			self.showResult('页面加载自检未通过：\n'
-				+ ((e && e.message) || '未知错误')
-				+ '\n—— 上面已含完整请求 URL。若含 HTTP403：会话无效，请退出重新登录 LuCI；'
-				+ '若含 HTTP404：服务端菜单树陈旧，请联系维护者重启 uwsgi 后重试。', 'err');
 		});
 	},
 
