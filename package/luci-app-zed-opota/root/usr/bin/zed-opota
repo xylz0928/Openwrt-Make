@@ -3,12 +3,12 @@
 #
 # 用法: zed-opota <check|space <bytes>|download <bytes>|progress|install|clean <target>>
 #
-# 固件源（2026-10-03 设计）：
-#   主源 GitHub Release（默认，永远优先）：tag=OP_x86_Official_Ryyyy-mm-dd
-#   备源 静态站（仅主源不可达时启用，版本信息始终输出给前端）：
-#     版本: https://static.z.7ze.top:20443/files/build_date_openwrt.txt  (YYYY-MM-DD)
-#     固件: https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz
-#     校验: https://static.z.7ze.top:20443/files/sha256sums （静态站需提供，缺失则中止下载）
+# 固件源（前台用户单选，默认 Zed-Github，后台不自动切换）：
+#   Zed-Github：GitHub Release，tag=OP_x86_Official_Ryyyy-mm-dd
+#   Zed-NAS：NAS 静态站（static.z.7ze.top:20443，= ZZ-Synology volume7 的 web 根）
+#     版本: /files/build_date_openwrt.txt  (YYYY-MM-DD)
+#     固件: /files/OpenWrt-x64.img.gz
+#     校验: /files/sha256sums （缺失则中止下载，绝不落无校验固件）
 #
 # 设计约束（对应需求 1.2 / 2.2 / 2.3）：
 #  - 不做任何更新缓存：check 每次实时探测两个源
@@ -30,7 +30,7 @@ IMG="openwrt-x86-64-generic-squashfs-combined-efi.img.gz"
 API="https://api.github.com/repos/${REPO}/releases/latest"
 MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
 
-# 备源（静态站）
+# Zed-NAS（静态站）
 STATIC_VER_URL="https://static.z.7ze.top:20443/files/build_date_openwrt.txt"
 STATIC_IMG_URL="https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz"
 STATIC_SHA_URL="https://static.z.7ze.top:20443/files/sha256sums"
@@ -113,8 +113,8 @@ asset_get() {
 }
 
 # ---------- 双源探测 ----------
-# 主源：GitHub Release（成功设置 GH_* 全局，返回 0）
-# 旧格式 tag（无 R 日期）视为不可用 → 自动回落备源
+# Zed-Github：GitHub Release（成功设置 GH_* 全局，返回 0）
+# 旧格式 tag（无 R 日期）视为不可用
 gh_probe() {
 	local json
 	json=$(release_json)
@@ -132,7 +132,7 @@ gh_probe() {
 	return 0
 }
 
-# 备源：静态站（成功设置 ST_* 全局，返回 0）
+# Zed-NAS：静态站（成功设置 ST_* 全局，返回 0）
 static_probe() {
 	local raw
 	raw=$(curl -fsSL --max-time 10 "$STATIC_VER_URL" 2>/dev/null | tr -d '\r\n' | cut -c1-40)
@@ -163,40 +163,46 @@ verify_core() {
 }
 
 # ---------- 子命令 ----------
+# do_check [source]：source=前台所选源（github=Zed-Github | static=Zed-NAS，默认 github），白名单
 do_check() {
-	local local_v gh_ok st_ok active upd asset img_url sha_url size
+	local local_v sel gh_ok st_ok selected_ok upd asset img_url sha_url size
 	local_v=$(local_ver)
 	[ -n "$local_v" ] || fail "无法读取本地固件版本"
+
+	case "${1:-github}" in
+	static) sel=static ;;
+	*) sel=github ;;
+	esac
 
 	gh_ok=false; st_ok=false
 	if gh_probe; then gh_ok=true; fi
 	if static_probe; then st_ok=true; fi
 
 	if [ "$gh_ok" = false ] && [ "$st_ok" = false ]; then
-		fail "GitHub 与静态站均不可达（网络异常或 API 限流）"
+		fail "Zed-Github 与 Zed-NAS 均不可达（网络异常或 API 限流）"
 	fi
 
-	# 源选择规则（用户拍板）：GitHub 永远优先；仅主源不可达时启用备源
-	if [ "$gh_ok" = true ]; then
-		active=github
+	# 源由前台选择：selected_ok=所选源是否可达；不可达则不给 URL、不动本地产物
+	selected_ok=false
+	asset=""; img_url=""; sha_url=""; size=0; upd=false
+	if [ "$sel" = github ] && [ "$gh_ok" = true ]; then
+		selected_ok=true
 		size=$GH_SIZE
 		img_url=$GH_IMG_URL
 		sha_url=$GH_SHA_URL
 		asset=$IMG
-		upd=false
 		[ "$GH_DATE" \> "$local_v" ] && upd=true
-	else
-		active=static
+	elif [ "$sel" = static ] && [ "$st_ok" = true ]; then
+		selected_ok=true
 		size=$ST_SIZE
 		img_url=$STATIC_IMG_URL
 		sha_url=$STATIC_SHA_URL
 		asset=$STATIC_ASSET
-		upd=false
 		[ "$ST_RDATE" \> "$local_v" ] && upd=true
 	fi
 
-	# 远端不比本地新：清理本地残留下载（进行中的下载不动）
-	if [ "$upd" = false ]; then
+	# 所选源可达且远端不比本地新：清理本地残留下载（进行中的下载不动）
+	if [ "$selected_ok" = true ] && [ "$upd" = false ]; then
 		case "$(stage_get)" in
 		downloading|verifying) ;;
 		*)
@@ -206,8 +212,8 @@ do_check() {
 		esac
 	fi
 
-	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${active}\"," \
-		"\"has_update\":${upd}," \
+	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${sel}\"," \
+		"\"selected_ok\":${selected_ok},\"has_update\":${upd}," \
 		"\"sources\":{" \
 		"\"github\":{\"ok\":${gh_ok},\"version\":\"$(jesc "${GH_DATE:-}")\"," \
 		"\"tag\":\"$(jesc "${GH_TAG:-}")\",\"size\":${GH_SIZE:-0}," \
@@ -234,30 +240,39 @@ do_space() {
 		"\"need\":${need},\"free\":${free},\"total\":${total},\"enough\":${enough}}"
 }
 
+# do_download <bytes> [source]：source=前台所选源（默认 github），白名单，不自动切换
 do_download() {
-	local fw cfg free total need size stage active asset img_url sha_url
+	local fw cfg free total need size stage sel asset img_url sha_url
 
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
+	case "${2:-github}" in
+	static) sel=static ;;
+	*) sel=github ;;
+	esac
 
 	stage=$(stage_get)
 	[ "$stage" = "downloading" ] && fail "固件正在下载中"
 
-	# 活选源（不缓存）：GitHub 永远优先
-	if gh_probe; then
-		active=github
-		asset=$IMG
-		img_url=$GH_IMG_URL
-		sha_url=$GH_SHA_URL
-		size=$GH_SIZE
-	elif static_probe; then
-		active=static
-		asset=$STATIC_ASSET
-		img_url=$STATIC_IMG_URL
-		sha_url=$STATIC_SHA_URL
-		size=$ST_SIZE
+	# 按用户所选源取地址（不可达即报错，不偷偷换源）
+	if [ "$sel" = github ]; then
+		if gh_probe; then
+			asset=$IMG
+			img_url=$GH_IMG_URL
+			sha_url=$GH_SHA_URL
+			size=$GH_SIZE
+		else
+			fail "所选固件源（Zed-Github）不可达，请切换固件源后重试"
+		fi
 	else
-		fail "GitHub 与静态站均不可达，无法下载"
+		if static_probe; then
+			asset=$STATIC_ASSET
+			img_url=$STATIC_IMG_URL
+			sha_url=$STATIC_SHA_URL
+			size=$ST_SIZE
+		else
+			fail "所选固件源（Zed-NAS）不可达，请切换固件源后重试"
+		fi
 	fi
 
 	# 下载前强制空间检查（需求 2.3）：优先用前端传来的 check 体积
@@ -278,7 +293,7 @@ do_download() {
 	rm -rf "$WORK"
 	mkdir -p "$WORK"
 	printf '%s' "$asset" > "$WORK/asset"
-	printf '%s' "$active" > "$WORK/source"
+	printf '%s' "$sel" > "$WORK/source"
 	printf '%s' "$size" > "$WORK/expected"
 	echo downloading > "$WORK/stage"
 
@@ -286,8 +301,8 @@ do_download() {
 	(
 		# 先取 sha256sums：拿不到就中止，绝不落无校验的固件（需求 2.2）
 		if ! curl -fsSL --retry 3 --max-time 600 -o "$WORK/sha256sums" "$sha_url"; then
-			if [ "$active" = static ]; then
-				echo "静态站未提供 sha256sums，无法校验，已中止下载" > "$WORK/err"
+			if [ "$sel" = static ]; then
+				echo "Zed-NAS 未提供 sha256sums，无法校验，已中止下载" > "$WORK/err"
 			else
 				echo "sha256sums 下载失败" > "$WORK/err"
 			fi
@@ -310,7 +325,7 @@ do_download() {
 		fi
 	) >> "$WORK/dl.log" 2>&1 &
 
-	emit "{\"ok\":true,\"stage\":\"downloading\",\"source\":\"${active}\",\"asset\":\"$(jesc "$asset")\"}"
+	emit "{\"ok\":true,\"stage\":\"downloading\",\"source\":\"${sel}\",\"asset\":\"$(jesc "$asset")\"}"
 }
 
 do_progress() {
@@ -402,9 +417,9 @@ cmd=${1:-}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
-check)		do_check ;;
+check)		do_check "${1:-github}" ;;
 space)		do_space "${1:-0}" ;;
-download)	do_download "${1:-0}" ;;
+download)	do_download "${1:-0}" "${2:-github}" ;;
 progress)	do_progress ;;
 install)	do_install ;;
 clean)		do_clean "${1:-}" ;;

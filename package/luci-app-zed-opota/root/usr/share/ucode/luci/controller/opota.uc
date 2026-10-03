@@ -32,9 +32,15 @@ function digits(v) {
 	return replace(v ?? "", /[^0-9]/g, "");
 }
 
+/* 固件源白名单（前台用户选择：Zed-Github | Zed-NAS，默认 github） */
+function src_param() {
+	let s = http.formvalue("source") ?? "";
+	return (s == "static") ? "static" : "github";
+}
+
 return {
 	act_check: function() {
-		relay("check");
+		relay("check " + src_param());
 	},
 
 	act_space: function() {
@@ -44,7 +50,7 @@ return {
 
 	act_download: function() {
 		let size = digits(http.formvalue("size"));
-		relay("download " + (size != "" ? size : "0"));
+		relay("download " + (size != "" ? size : "0") + " " + src_param());
 	},
 
 	act_progress: function() {
