@@ -42,12 +42,14 @@ var CSS = [
 	'  color:#b02525}',
 	'#zed-opota .opota-result.is-info{background:rgba(62,123,250,.10);border:1px solid rgba(62,123,250,.35);',
 	'  color:#2b5bd7}',
+	'#zed-opota .src-ok{color:#2b7a3d;font-weight:700}',
+	'#zed-opota .src-bad{color:#b02525;font-weight:700}',
 	'#zed-opota .opota-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}',
 	'#zed-opota .opota-btns.hidden{display:none}',
 	'#zed-opota .opota-note{font-size:12px;color:#889; margin-top:10px}'
 ].join('\n');
 
-function api(name, params) {
+function api(name, params, timeoutMs) {
 	var url = L.env.admin_path + 'system/opota/' + name;
 	if (params) {
 		var qs = Object.keys(params).map(function(k) {
@@ -57,7 +59,8 @@ function api(name, params) {
 	}
 	return new Promise(function(resolve, reject) {
 		var ctl = new AbortController();
-		var timer = setTimeout(function() { ctl.abort(); }, 15000);
+		/* check 需要顺序探测双源（GitHub API + 静态站 + HEAD），放宽到 30s */
+		var timer = setTimeout(function() { ctl.abort(); }, timeoutMs || 15000);
 		fetch(url, { signal: ctl.signal })
 			.then(function(r) { return r.json(); })
 			.then(function(d) { clearTimeout(timer); resolve(d); })
@@ -71,6 +74,18 @@ function fmtBytes(n) {
 	if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
 	if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
 	return n + ' B';
+}
+
+/* HTML 转义（版本号/tag 等远端文本进 innerHTML 前必须转义） */
+function esc(s) {
+	return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
+		return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+	});
+}
+
+/* 源标签 */
+function srcLabel(s) {
+	return s === 'static' ? '备源 静态站' : '主源 GitHub';
 }
 
 function $(id) { return document.getElementById(id); }
@@ -147,7 +162,7 @@ return view.extend({
 
 		var node = E('div', { 'class': 'cbi-section', 'id': 'zed-opota' }, [
 			E('h3', {}, ['在线升级 OTA']),
-			E('p', {}, ['从 GitHub Release 拉取官方 x86 固件，sha256 校验通过后可直接刷入（保留当前配置）。更新检查不使用缓存，每次点击实时查询。']),
+			E('p', {}, ['主源 GitHub Release（默认，永远优先），备源静态站 static.z.7ze.top（主源不可达时自动启用，版本实时显示）。sha256 校验通过后可直接刷入（保留当前配置）。更新检查不使用缓存，每次点击实时探测双源。']),
 			card,
 			E('p', { 'class': 'opota-note' }, [
 				'提示：固件下载到 /tmp（tmpfs）。空间不足时可先用右侧按钮清理缓存；OpenClash Smart 缓存与 udpxy 缓存为原地清零，无需重启进程。'
@@ -228,44 +243,65 @@ return view.extend({
 		if (busy) return;
 		self.setBusy(true);
 		self.hideResult();
-		self.setStatus('checking', '正在查询 GitHub 最新 release…');
-		api('check').then(function(d) {
+		self.setStatus('checking', '正在探测 GitHub 主源与静态站备源…');
+		api('check', null, 30000).then(function(d) {
 			self.setBusy(false);
 			if (!d || !d.ok) {
 				self.setStatus('error', '检查失败');
-				self.showResult('检查更新失败：' + ((d && d.error) || '网络不可达或 GitHub API 限流'), 'err');
+				self.showResult('检查更新失败：' + ((d && d.error) || 'GitHub 与静态站均不可达'), 'err');
 				return;
 			}
 			lastCheck = d;
+			var gh = (d.sources && d.sources.github) || { ok: false };
+			var st = (d.sources && d.sources.static) || { ok: false };
+			var remote = d.active === 'static' ? st.version : gh.version;
+
+			/* 双源状态展示（含静态站最新版本输出） */
 			var detailEl = $('opota-detail');
 			if (detailEl) {
-				detailEl.textContent = '本地版本 ' + d.local + '  →  远端版本 ' + d.remote
-					+ '（' + d.tag + '）'
-					+ (d.published ? '，发布于 ' + d.published : '')
-					+ (d.size ? '，固件 ' + fmtBytes(d.size) : '');
+				var rows = [];
+				rows.push('本地版本：<b>' + esc(d.local) + '</b>　　当前使用源：<b>' + srcLabel(d.active) + '</b>');
+				rows.push('主源 GitHub：' + (gh.ok
+					? '<span class="src-ok">可达</span>　最新 ' + esc(gh.version || '-')
+						+ (gh.tag ? '（' + esc(gh.tag) + '）' : '')
+						+ (gh.published ? '　发布于 ' + esc(gh.published) : '')
+						+ (gh.size ? '　固件 ' + fmtBytes(gh.size) : '')
+					: '<span class="src-bad">不可达</span>（API 限流或网络异常）'));
+				rows.push('备源 静态站：' + (st.ok
+					? '<span class="src-ok">可达</span>　最新版本 <b>' + esc(st.version || '-')
+						+ '</b>（build_date_openwrt.txt）'
+						+ (st.size ? '　固件 ' + fmtBytes(st.size) : '')
+					: '<span class="src-bad">不可达</span>'));
+				detailEl.innerHTML = rows.map(function(r) { return '<div>' + r + '</div>'; }).join('');
 			}
+
 			var lnk = $('opota-lnk-download');
 			if (lnk) {
 				lnk.href = d.img_url || '#';
+				lnk.textContent = '下载链接（' + srcLabel(d.active) + '）';
 				lnk.style.display = d.has_update ? '' : 'none';
 			}
 			if (d.has_update) {
-				self.setStatus('update', '检测到新固件 ' + d.remote + '（当前 ' + d.local + '）');
+				self.setStatus('update', '检测到新固件 ' + (remote || '?')
+					+ '（当前 ' + d.local + '，经' + srcLabel(d.active) + '）');
 				self.showUpdateRow(true);
 				var fb = $('opota-btn-flash');
 				if (fb) fb.style.display = 'none';
 				var ub = $('opota-btn-update');
 				if (ub) ub.style.display = '';
-				self.showResult('已检测到更新，可点击"立即更新"下载并校验固件。', 'info');
+				self.showResult('已检测到更新（下载源：' + srcLabel(d.active)
+					+ '），可点击"立即更新"下载并校验固件。', 'info');
 			} else {
 				self.setStatus('latest', '当前已是最新固件（' + d.local + '）');
 				self.showUpdateRow(false);
-				self.showResult('远端没有比当前更新的版本。同日多次编译会覆盖同一天的 release，版本日期相同即视为已最新。', 'ok');
+				self.showResult('两源均没有比当前更新的版本'
+					+ (st.ok ? '（静态站最新 ' + st.version + '）' : '')
+					+ '。同日多次编译会覆盖同一天的 release，版本日期相同即视为已最新。', 'ok');
 			}
 		}).catch(function(e) {
 			self.setBusy(false);
 			self.setStatus('error', '检查失败');
-			self.showResult('检查更新失败：请求超时或网络不可达', 'err');
+			self.showResult('检查更新失败：请求超时或两源均不可达', 'err');
 		});
 	},
 
@@ -337,6 +373,8 @@ return view.extend({
 				}
 				return;
 			}
+			if (d.source)
+				self.setStatus('downloading', '正在下载固件（' + srcLabel(d.source) + '）…');
 			self.startPolling();
 		}).catch(function(e) {
 			self.setBusy(false);
@@ -361,7 +399,7 @@ return view.extend({
 		var self = this;
 		switch (d.stage) {
 		case 'downloading':
-			self.setStatus('downloading', '正在下载固件…');
+			self.setStatus('downloading', '正在下载固件（' + srcLabel(d.source) + '）…');
 			self.showProgress(d.percent || 0);
 			break;
 		case 'verifying':

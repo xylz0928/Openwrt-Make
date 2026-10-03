@@ -1,14 +1,20 @@
 #!/bin/sh
-# zed-opota —— 官方 x86 固件 OTA 核心
+# zed-opota —— 官方 x86 固件 OTA 核心（双源版）
 #
 # 用法: zed-opota <check|space <bytes>|download <bytes>|progress|install|clean <target>>
 #
+# 固件源（2026-10-03 设计）：
+#   主源 GitHub Release（默认，永远优先）：tag=OP_x86_Official_Ryyyy-mm-dd
+#   备源 静态站（仅主源不可达时启用，版本信息始终输出给前端）：
+#     版本: https://static.z.7ze.top:20443/files/build_date_openwrt.txt  (YYYY-MM-DD)
+#     固件: https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz
+#     校验: https://static.z.7ze.top:20443/files/sha256sums （静态站需提供，缺失则中止下载）
+#
 # 设计约束（对应需求 1.2 / 2.2 / 2.3）：
-#  - 不做任何更新缓存：check 每次实时请求 GitHub API
+#  - 不做任何更新缓存：check 每次实时探测两个源
 #  - 下载前强制 tmpfs 空间检查：固件体积 + 当前配置备份体积 + 4MB 余量
 #  - 刷机前强制 sha256 校验，失败删除产物并明确报"下载成功但固件校验失败"
-#  - 清理目标白名单（smart/udpxy），且用"原地清零"而非 rm：
-#    实机确认 clash / udpxy 均持有文件句柄，rm 不释放空间，truncate 才释放
+#  - 清理目标白名单（smart/udpxy），"原地清零"截断（进程持句柄时 rm 不释放空间）
 #
 # stdout 只输出 JSON；进度/状态落盘 /tmp/zzota/（瞬态下载状态，非更新缓存）
 
@@ -23,6 +29,12 @@ REPO="xylz0928/Openwrt-Make"
 IMG="openwrt-x86-64-generic-squashfs-combined-efi.img.gz"
 API="https://api.github.com/repos/${REPO}/releases/latest"
 MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
+
+# 备源（静态站）
+STATIC_VER_URL="https://static.z.7ze.top:20443/files/build_date_openwrt.txt"
+STATIC_IMG_URL="https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz"
+STATIC_SHA_URL="https://static.z.7ze.top:20443/files/sha256sums"
+STATIC_ASSET="OpenWrt-x64.img.gz"
 
 mkdir -p "$WORK"
 
@@ -46,7 +58,7 @@ fail() {
 	exit 0
 }
 
-# ---------- 数据源 ----------
+# ---------- 通用数据源 ----------
 local_ver() {
 	grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' "$RELEASE_FILE" 2>/dev/null | head -n1
 }
@@ -56,14 +68,6 @@ release_json() {
 		-H 'Accept: application/vnd.github+json' \
 		-H 'User-Agent: zed-opota' \
 		"$API" 2>/dev/null
-}
-
-# 取远端最新 release 的 tag（stdout），失败返回 1
-get_remote() {
-	local tag
-	tag=$(release_json | jsonfilter -e '@.tag_name' 2>/dev/null)
-	[ -n "$tag" ] || return 1
-	printf '%s' "$tag"
 }
 
 # HEAD 获取远端固件字节数（stdout 数字），失败输出 0
@@ -104,56 +108,114 @@ err_get() {
 	cat "$WORK/err" 2>/dev/null
 }
 
+asset_get() {
+	cat "$WORK/asset" 2>/dev/null || printf '%s' "$IMG"
+}
+
+# ---------- 双源探测 ----------
+# 主源：GitHub Release（成功设置 GH_* 全局，返回 0）
+# 旧格式 tag（无 R 日期）视为不可用 → 自动回落备源
+gh_probe() {
+	local json
+	json=$(release_json)
+	[ -n "$json" ] || return 1
+	GH_TAG=$(printf '%s' "$json" | jsonfilter -e '@.tag_name' 2>/dev/null)
+	[ -n "$GH_TAG" ] || return 1
+	GH_DATE=$(printf '%s' "$GH_TAG" | grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
+	[ -n "$GH_DATE" ] || return 1
+	GH_IMG_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/${IMG}"
+	GH_SHA_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/sha256sums"
+	GH_SIZE=$(remote_size "$GH_IMG_URL")
+	case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
+	GH_PUB=$(printf '%s' "$json" | jsonfilter -e '@.published_at' 2>/dev/null)
+	GH_PUB=${GH_PUB:-}
+	return 0
+}
+
+# 备源：静态站（成功设置 ST_* 全局，返回 0）
+static_probe() {
+	local raw
+	raw=$(curl -fsSL --max-time 10 "$STATIC_VER_URL" 2>/dev/null | tr -d '\r\n' | cut -c1-40)
+	ST_DATE=$(printf '%s' "$raw" | grep -o 'R\{0,1\}[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' | head -n1)
+	[ -n "$ST_DATE" ] || return 1
+	ST_RDATE=$ST_DATE
+	case "$ST_RDATE" in R*) ;; *) ST_RDATE="R$ST_RDATE" ;; esac
+	ST_SIZE=$(remote_size "$STATIC_IMG_URL")
+	case "$ST_SIZE" in ''|*[!0-9]*) ST_SIZE=0 ;; esac
+	return 0
+}
+
 # ---------- 核心校验（download 后台流程与 install 前各调用一次） ----------
 # 返回 0 = 匹配；1 = 不匹配/缺文件
 verify_core() {
-	local want got
-	[ -f "$WORK/$IMG" ] && [ -f "$WORK/sha256sums" ] || return 1
-	want=$(awk -v f="$IMG" '
+	local asset fw want got
+	asset=$(asset_get)
+	fw="$WORK/$asset"
+	[ -f "$fw" ] && [ -f "$WORK/sha256sums" ] || return 1
+	want=$(awk -v f="$asset" '
 		{
 			name = $2; sub(/^\*/, "", name);
 			if (name == f) { print $1; exit }
 		}' "$WORK/sha256sums")
 	[ -n "$want" ] || return 1
-	got=$(sha256sum "$WORK/$IMG" | awk '{print $1}')
+	got=$(sha256sum "$fw" | awk '{print $1}')
 	[ "$want" = "$got" ]
 }
 
 # ---------- 子命令 ----------
 do_check() {
-	local local_v json tag tag_v size pub img_url sha_url upd
+	local local_v gh_ok st_ok active upd asset img_url sha_url size
 	local_v=$(local_ver)
 	[ -n "$local_v" ] || fail "无法读取本地固件版本"
 
-	json=$(release_json)
-	tag=$(printf '%s' "$json" | jsonfilter -e '@.tag_name' 2>/dev/null)
-	[ -n "$tag" ] || fail "无法获取远端版本（GitHub API 不可达）"
+	gh_ok=false; st_ok=false
+	if gh_probe; then gh_ok=true; fi
+	if static_probe; then st_ok=true; fi
 
-	tag_v=$(printf '%s' "$tag" | grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
-	[ -n "$tag_v" ] || fail "远端 tag 缺少版本日期"
-
-	img_url="https://github.com/${REPO}/releases/download/${tag}/${IMG}"
-	sha_url="https://github.com/${REPO}/releases/download/${tag}/sha256sums"
-	size=$(remote_size "$img_url")
-	case "$size" in ''|*[!0-9]*) size=0 ;; esac
-
-	# yyyy-mm-dd 字典序即时间序
-	upd=false
-	[ "$tag_v" \> "$local_v" ] && upd=true
-
-	# 远端不比本地新：清理本地残留下载（避免占 tmpfs / 用旧产物误刷）
-	if [ "$upd" = false ]; then
-		rm -f "$WORK/$IMG" "$WORK/$IMG.part" "$WORK/sha256sums" \
-			"$WORK/stage" "$WORK/err" "$WORK/expected"
+	if [ "$gh_ok" = false ] && [ "$st_ok" = false ]; then
+		fail "GitHub 与静态站均不可达（网络异常或 API 限流）"
 	fi
 
-	pub=$(printf '%s' "$json" | jsonfilter -e '@.published_at' 2>/dev/null)
-	pub=${pub:-""}
+	# 源选择规则（用户拍板）：GitHub 永远优先；仅主源不可达时启用备源
+	if [ "$gh_ok" = true ]; then
+		active=github
+		size=$GH_SIZE
+		img_url=$GH_IMG_URL
+		sha_url=$GH_SHA_URL
+		asset=$IMG
+		upd=false
+		[ "$GH_DATE" \> "$local_v" ] && upd=true
+	else
+		active=static
+		size=$ST_SIZE
+		img_url=$STATIC_IMG_URL
+		sha_url=$STATIC_SHA_URL
+		asset=$STATIC_ASSET
+		upd=false
+		[ "$ST_RDATE" \> "$local_v" ] && upd=true
+	fi
 
-	emit "{\"ok\":true,\"local\":\"${local_v}\",\"remote\":\"${tag_v}\"," \
-		"\"tag\":\"$(jesc "$tag")\",\"has_update\":${upd}," \
-		"\"size\":${size},\"img_url\":\"${img_url}\",\"sha_url\":\"${sha_url}\"," \
-		"\"published\":\"$(jesc "$pub")\"}"
+	# 远端不比本地新：清理本地残留下载（进行中的下载不动）
+	if [ "$upd" = false ]; then
+		case "$(stage_get)" in
+		downloading|verifying) ;;
+		*)
+			rm -rf "$WORK"
+			mkdir -p "$WORK"
+			;;
+		esac
+	fi
+
+	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${active}\"," \
+		"\"has_update\":${upd}," \
+		"\"sources\":{" \
+		"\"github\":{\"ok\":${gh_ok},\"version\":\"$(jesc "${GH_DATE:-}")\"," \
+		"\"tag\":\"$(jesc "${GH_TAG:-}")\",\"size\":${GH_SIZE:-0}," \
+		"\"published\":\"$(jesc "${GH_PUB:-}")\"}," \
+		"\"static\":{\"ok\":${st_ok},\"version\":\"$(jesc "${ST_DATE:-}")\"," \
+		"\"size\":${ST_SIZE:-0}}}," \
+		"\"img_url\":\"$(jesc "$img_url")\",\"sha_url\":\"$(jesc "$sha_url")\"," \
+		"\"asset\":\"$(jesc "$asset")\",\"size\":${size}}"
 }
 
 do_space() {
@@ -173,74 +235,92 @@ do_space() {
 }
 
 do_download() {
-	local fw cfg free total need tag img_url sha_url stage
+	local fw cfg free total need size stage active asset img_url sha_url
+
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
 
 	stage=$(stage_get)
 	[ "$stage" = "downloading" ] && fail "固件正在下载中"
 
-	# 下载前强制空间检查（需求 2.3）
-	if [ "$fw" -eq 0 ]; then
-		tag=$(get_remote) || fail "无法获取远端版本，无法执行空间检查"
-		img_url="https://github.com/${REPO}/releases/download/${tag}/${IMG}"
-		fw=$(remote_size "$img_url")
-		case "$fw" in ''|*[!0-9]*) fw=0 ;; esac
-		[ "$fw" -gt 0 ] || fail "无法获取固件体积，无法执行空间检查"
+	# 活选源（不缓存）：GitHub 永远优先
+	if gh_probe; then
+		active=github
+		asset=$IMG
+		img_url=$GH_IMG_URL
+		sha_url=$GH_SHA_URL
+		size=$GH_SIZE
+	elif static_probe; then
+		active=static
+		asset=$STATIC_ASSET
+		img_url=$STATIC_IMG_URL
+		sha_url=$STATIC_SHA_URL
+		size=$ST_SIZE
+	else
+		fail "GitHub 与静态站均不可达，无法下载"
 	fi
+
+	# 下载前强制空间检查（需求 2.3）：优先用前端传来的 check 体积
+	[ "$fw" -gt 0 ] && size=$fw
+	[ "$size" -gt 0 ] || fail "无法获取固件体积，无法执行空间检查"
 	cfg=$(cfg_size)
 	free=$(tmp_free)
 	total=$(tmp_total)
-	need=$((fw + cfg + MARGIN))
+	need=$((size + cfg + MARGIN))
 	if [ "$free" -lt "$need" ]; then
 		emit "{\"ok\":false,\"error\":\"tmpfs 空间不足，无法下载固件\"," \
-			"\"code\":\"space\",\"fw\":${fw},\"cfg\":${cfg},\"margin\":${MARGIN}," \
+			"\"code\":\"space\",\"fw\":${size},\"cfg\":${cfg},\"margin\":${MARGIN}," \
 			"\"need\":${need},\"free\":${free},\"total\":${total}}"
 		exit 0
 	fi
 
-	# 远端地址实时解析（不缓存）
-	tag=$(get_remote) || fail "无法获取远端版本（GitHub API 不可达）"
-	img_url="https://github.com/${REPO}/releases/download/${tag}/${IMG}"
-	sha_url="https://github.com/${REPO}/releases/download/${tag}/sha256sums"
-
-	rm -f "$WORK/$IMG" "$WORK/$IMG.part" "$WORK/sha256sums" "$WORK/err"
-	printf '%s' "$fw" > "$WORK/expected"
+	# 重置工作区（busy 检查已在前面通过）
+	rm -rf "$WORK"
+	mkdir -p "$WORK"
+	printf '%s' "$asset" > "$WORK/asset"
+	printf '%s' "$active" > "$WORK/source"
+	printf '%s' "$size" > "$WORK/expected"
 	echo downloading > "$WORK/stage"
 
 	# 后台下载 + 自动校验（liquid/pushbot 同款"子 shell &"模式，不阻塞 rpcd）
 	(
+		# 先取 sha256sums：拿不到就中止，绝不落无校验的固件（需求 2.2）
 		if ! curl -fsSL --retry 3 --max-time 600 -o "$WORK/sha256sums" "$sha_url"; then
-			echo "sha256sums 下载失败" > "$WORK/err"
+			if [ "$active" = static ]; then
+				echo "静态站未提供 sha256sums，无法校验，已中止下载" > "$WORK/err"
+			else
+				echo "sha256sums 下载失败" > "$WORK/err"
+			fi
 			echo failed > "$WORK/stage"
 			exit 1
 		fi
-		if ! curl -fL --retry 3 --max-time 1800 -o "$WORK/$IMG.part" "$img_url"; then
+		if ! curl -fL --retry 3 --max-time 1800 -o "$WORK/$asset.part" "$img_url"; then
 			echo "固件下载失败" > "$WORK/err"
 			echo failed > "$WORK/stage"
 			exit 1
 		fi
-		mv "$WORK/$IMG.part" "$WORK/$IMG"
+		mv "$WORK/$asset.part" "$WORK/$asset"
 		echo verifying > "$WORK/stage"
 		if verify_core; then
 			echo ready > "$WORK/stage"
 		else
 			echo "下载成功但固件校验失败" > "$WORK/err"
-			rm -f "$WORK/$IMG" "$WORK/sha256sums"
+			rm -f "$WORK/$asset" "$WORK/sha256sums"
 			echo failed > "$WORK/stage"
 		fi
 	) >> "$WORK/dl.log" 2>&1 &
 
-	emit "{\"ok\":true,\"stage\":\"downloading\"}"
+	emit "{\"ok\":true,\"stage\":\"downloading\",\"source\":\"${active}\",\"asset\":\"$(jesc "$asset")\"}"
 }
 
 do_progress() {
-	local stage got total percent
+	local stage got total percent asset
 	stage=$(stage_get)
+	asset=$(asset_get)
 	got=0
-	[ -f "$WORK/$IMG.part" ] && got=$(wc -c < "$WORK/$IMG.part" | tr -dc '0-9')
-	if [ "$got" -eq 0 ] && [ -f "$WORK/$IMG" ]; then
-		got=$(wc -c < "$WORK/$IMG" | tr -dc '0-9')
+	[ -f "$WORK/$asset.part" ] && got=$(wc -c < "$WORK/$asset.part" | tr -dc '0-9')
+	if [ "$got" -eq 0 ] && [ -f "$WORK/$asset" ]; then
+		got=$(wc -c < "$WORK/$asset" | tr -dc '0-9')
 	fi
 	total=$(cat "$WORK/expected" 2>/dev/null | tr -dc '0-9')
 	total=${total:-0}
@@ -252,30 +332,33 @@ do_progress() {
 	[ "$stage" = "ready" ] && percent=100
 
 	emit "{\"ok\":true,\"stage\":\"${stage}\",\"got\":${got},\"total\":${total}," \
-		"\"percent\":${percent},\"error\":\"$(jesc "$(err_get)")\"}"
+		"\"percent\":${percent},\"source\":\"$(cat "$WORK/source" 2>/dev/null)\"," \
+		"\"error\":\"$(jesc "$(err_get)")\"}"
 }
 
 do_install() {
-	local test_out
-	[ -f "$WORK/$IMG" ] || fail "没有已下载的固件"
+	local asset fw test_out
+	asset=$(asset_get)
+	fw="$WORK/$asset"
+	[ -f "$fw" ] || fail "没有已下载的固件"
 
 	# 需求 2.2：执行更新前再次校验，不匹配则删除产物并明确提示
 	if ! verify_core; then
-		rm -f "$WORK/$IMG" "$WORK/sha256sums"
+		rm -f "$fw" "$WORK/sha256sums"
 		echo "下载成功但固件校验失败" > "$WORK/err"
 		echo failed > "$WORK/stage"
 		fail "下载成功但固件校验失败，已删除固件产物"
 	fi
 
 	# 与官方 flash 页一致：先 --test 平台校验
-	if ! test_out=$(sysupgrade --test "$WORK/$IMG" 2>&1); then
+	if ! test_out=$(sysupgrade --test "$fw" 2>&1); then
 		printf '%s\n' "$test_out" > "$WORK/install.log"
 		fail "sysupgrade 镜像校验未通过，未执行刷机"
 	fi
 
 	echo installing > "$WORK/stage"
 	(
-		sysupgrade -v "$WORK/$IMG" > "$WORK/install.log" 2>&1
+		sysupgrade -v "$fw" > "$WORK/install.log" 2>&1
 	) &
 	emit "{\"ok\":true,\"stage\":\"installing\"}"
 }
