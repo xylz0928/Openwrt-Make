@@ -80,7 +80,7 @@ var CSS = [
 ].join('\n');
 
 function api(name, params, timeoutMs) {
-	var url = L.env.admin_path + 'system/opota/' + name;
+	var url = adminBase() + 'system/opota/' + name;
 	if (params) {
 		var qs = Object.keys(params).map(function(k) {
 			return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
@@ -138,6 +138,19 @@ function esc(s) {
 	return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
 		return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
 	});
+}
+
+/* LuCI 管理路径：L.env.admin_path 在部分构建上是 undefined（实机踩坑：
+ * 所有端点被拼成相对 URL "undefinedsystem/..." → 404），改用三层推导：
+ * 1) 字符串型 admin_path 2) 当前页面 pathname 的 "/admin/" 截断（最可靠）
+ * 3) 标准字面量兜底 */
+function adminBase() {
+	if (window.L && L.env && typeof L.env.admin_path === 'string' && L.env.admin_path)
+		return L.env.admin_path;
+	var p = (window.location && window.location.pathname) || '';
+	var i = p.lastIndexOf('/admin/');
+	if (i >= 0) return p.substring(0, i + 7);
+	return '/cgi-bin/luci/admin/';
 }
 
 /* 源显示名（用户命名：Zed-Github / Zed-NAS） */
