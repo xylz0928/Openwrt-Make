@@ -369,24 +369,24 @@ return view.extend({
 			var remote = d.active === 'static' ? st.version : gh.version;
 
 			/* 双源状态展示（含 Zed-NAS 最新版本输出） */
+			/* 只输出所选源的状态行（单源探测，不再罗列未选源） */
 			var srcEl = $('opota-sources');
 			if (srcEl) {
 				var rows = [];
 				rows.push('本地版本：' + esc(d.local) + '　所选源：' + srcLabel(d.active));
-				rows.push('Zed-Github：' + (!gh.checked
-					? '<span style="opacity:.75">本次未检测（点击该源即查询）</span>'
-					: (gh.ok
+				if (d.active === 'static') {
+					rows.push('Zed-NAS：' + (st.ok
+						? '<span class="src-ok">✓ 可达</span>　最新版本 <b>' + esc(st.version || '-')
+							+ '</b>' + (st.size ? '　' + fmtBytes(st.size) : '')
+						: '<span class="src-bad">✗ 不可达</span>'));
+				} else {
+					rows.push('Zed-Github：' + (gh.ok
 						? '<span class="src-ok">✓ 可达</span>　' + esc(gh.version || '-')
 							+ (gh.tag ? '　' + esc(gh.tag) : '')
 							+ (gh.published ? '　' + esc(gh.published) : '')
 							+ (gh.size ? '　' + fmtBytes(gh.size) : '')
-						: '<span class="src-bad">✗ 不可达</span>')));
-				rows.push('Zed-NAS：' + (!st.checked
-					? '<span style="opacity:.75">本次未检测（点击该源即查询）</span>'
-					: (st.ok
-						? '<span class="src-ok">✓ 可达</span>　最新版本 <b>' + esc(st.version || '-')
-							+ '</b>' + (st.size ? '　' + fmtBytes(st.size) : '')
-						: '<span class="src-bad">✗ 不可达</span>')));
+						: '<span class="src-bad">✗ 不可达</span>'));
+				}
 				srcEl.innerHTML = rows.map(function(x) { return '<div>' + x + '</div>'; }).join('');
 			}
 
