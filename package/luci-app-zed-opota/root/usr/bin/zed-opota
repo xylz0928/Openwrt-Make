@@ -220,16 +220,8 @@ do_check() {
 		[ "$ST_RDATE" \> "$local_v" ] && upd=true
 	fi
 
-	# 所选源可达且远端不比本地新：清理本地残留下载（进行中的下载不动）
-	if [ "$selected_ok" = true ] && [ "$upd" = false ]; then
-		case "$(stage_get)" in
-		downloading|verifying) ;;
-		*)
-			rm -rf "$WORK"
-			mkdir -p "$WORK"
-			;;
-		esac
-	fi
+	# 注意：固件不同于插件——版本一致/线上更旧也保留下载产物与刷写能力，
+	# has_update 仅作提示字段交前端展示，由用户自行判断是否刷写。
 
 	# 操作日志（≤100行；keep.d 声明 → 固件刷新后仍在）
 	remote=""
@@ -238,9 +230,11 @@ do_check() {
 	if [ "$selected_ok" = false ]; then
 		log_line "检查更新[$sel]：所选源不可达（本地 $local_v）"
 	elif [ "$upd" = true ]; then
-		log_line "检查更新[$sel]：发现新版本（$local_v → $remote）"
+		log_line "检查更新[$sel]：线上较新（$local_v → $remote）"
+	elif [ "$remote" = "$local_v" ]; then
+		log_line "检查更新[$sel]：与线上一致（$local_v，可重刷）"
 	else
-		log_line "检查更新[$sel]：已是最新（$local_v，远端 $remote）"
+		log_line "检查更新[$sel]：本地高于线上（本地 $local_v > 线上 $remote，可刷写）"
 	fi
 
 	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${sel}\"," \

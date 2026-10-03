@@ -373,25 +373,32 @@ return view.extend({
 				return;
 			}
 
-			if (d.has_update) {
-				self.setStatus('update', '检测到新固件 ' + (remote || '?')
-					+ '（当前 ' + d.local + '）');
-				self.setSub('当前 ' + d.local + '　经 ' + srcLabel(d.active));
-				self.showUpdateRow(true);
-				var fb = $('opota-btn-flash');
-				if (fb) fb.style.display = 'none';
-				var ub = $('opota-btn-update');
-				if (ub) { ub.style.display = ''; ub.disabled = false; }
-				if (lnk) lnk.style.display = '';
-				self.showResult('经 ' + srcLabel(d.active) + ' 检出更新，点"立即更新"下载并校验固件。', 'info');
+			/* 固件不同于插件：版本差异只做提示，刷写入口三态常开 */
+			var norm = function(v) { v = String(v || ''); return /^\d/.test(v) ? 'R' + v : v; };
+			var rem = norm(remote), loc = norm(d.local);
+			var rel = (rem === loc) ? 'equal' : ((rem > loc) ? 'newer' : 'older');
+
+			self.showUpdateRow(true);
+			var fb = $('opota-btn-flash');
+			if (fb) fb.style.display = 'none';
+			var ub = $('opota-btn-update');
+			if (ub) { ub.style.display = ''; ub.disabled = false; }
+			if (lnk) lnk.style.display = '';
+
+			if (rel === 'newer') {
+				self.setStatus('update', '线上有更新版本 ' + rem);
+				self.setSub('本地 ' + loc + '　经 ' + srcLabel(d.active));
+				self.showResult('版本提示：线上 ' + rem + ' 大于本地 ' + loc
+					+ '。\n点"立即更新"下载并校验固件。', 'info');
+			} else if (rel === 'equal') {
+				self.setStatus('latest', '与线上版本一致（' + loc + '）');
+				self.setSub('经 ' + srcLabel(d.active) + ' 查询　同日重编译会覆盖同日产物');
+				self.showResult('版本提示：与线上一致。\n仍可下载并刷写（重刷/救砖均可），是否刷写请自行判断。', 'ok');
 			} else {
-				self.setStatus('latest', '当前已是最新固件');
-				self.setSub(d.local + '　两源均无更新版本');
-				self.showUpdateRow(false);
-				if (lnk) lnk.style.display = 'none';
-				self.showResult(st.ok ? 'Zed-NAS 最新版本 ' + st.version
-					+ '，与本地一致或更旧；同日多次编译覆盖同日 release，日期相同即已最新。'
-					: '远端没有比当前更新的版本；同日多次编译覆盖同日 release，日期相同即已最新。', 'ok');
+				self.setStatus('ready', '本地版本高于线上');
+				self.setSub('本地 ' + loc + '　线上 ' + (rem || '?') + '　经 ' + srcLabel(d.active));
+				self.showResult('版本提示：本地 ' + loc + ' 高于线上 ' + (rem || '?')
+					+ '（可能是当日新构建或开发版）。\n仍可下载并刷写，是否用线上版本覆盖请自行判断。', 'info');
 			}
 		}).catch(function(e) {
 			self.setBusy(false);
