@@ -15,7 +15,6 @@
 var lastCheck = null;	/* 最近一次 check 结果 */
 var autoFlash = false;	/* 立即更新=校验通过后自动进入刷机；拉取更新=false */
 var pollTimer = null;
-var resultTimer = null;
 var busy = false;
 
 /* ── liquid 风格样式 ── */
@@ -307,22 +306,18 @@ return view.extend({
 		if (s) s.textContent = text || '';
 	},
 
-	/* 结果面板（ok/info 默认10s 自动消失；keep=true 常驻；err/log 常驻） */
-	showResult: function(msg, cls, keep) {
+	/* 结果面板：一律常驻（自动消失已按用户要求彻底取消），
+	   每次动作开始时 hideResult() 清掉上一条 */
+	showResult: function(msg, cls) {
 		var r = $('opota-result');
 		if (!r) return;
-		if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
 		r.className = 'opota-result show is-' + (cls || 'info');
 		r.textContent = msg;
-		if ((cls === 'ok' || cls === 'info') && !keep) {
-			resultTimer = setTimeout(function() { r.className = 'opota-result'; }, 10000);
-		}
 	},
 
 	hideResult: function() {
 		var r = $('opota-result');
 		if (r) r.className = 'opota-result';
-		if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
 	},
 
 	setBusy: function(v) {
@@ -426,12 +421,12 @@ return view.extend({
 			} else if (rel === 'equal') {
 				self.setStatus('latest', '与线上版本一致（' + loc + '）');
 				self.setSub('经 ' + srcLabel(d.active) + ' 查询　同日重编译会覆盖同日产物');
-				self.showResult('版本提示：与线上一致。\n仍可下载并刷写（重刷/救砖均可），是否刷写请自行判断。', 'ok', true);
+				self.showResult('版本提示：与线上一致。\n仍可下载并刷写（重刷/救砖均可），是否刷写请自行判断。', 'ok');
 			} else {
 				self.setStatus('ready', '本地版本高于线上');
 				self.setSub('本地 ' + loc + '　线上 ' + (rem || '?') + '　经 ' + srcLabel(d.active));
 				self.showResult('版本提示：本地 ' + loc + ' 高于线上 ' + (rem || '?')
-					+ '（可能是当日新构建或开发版）。\n仍可下载并刷写，是否用线上版本覆盖请自行判断。', 'info', true);
+					+ '（可能是当日新构建或开发版）。\n仍可下载并刷写，是否用线上版本覆盖请自行判断。', 'info');
 			}
 		}).catch(function(e) {
 			self.setBusy(false);
