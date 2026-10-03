@@ -72,5 +72,9 @@ return {
 		}
 
 		relay("clean " + t);
+	},
+
+	act_log: function() {
+		relay("log");
 	}
 };

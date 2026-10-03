@@ -25,6 +25,11 @@ WORK=${OPOTA_WORK:-/tmp/zzota}
 RELEASE_FILE=${OPOTA_RELEASE_FILE:-/etc/openwrt_release}
 SMART_FILE=${OPOTA_SMART_FILE:-/etc/openclash/smart_weight_data.csv}
 UDPXY_FILE=${OPOTA_UDPXY_FILE:-/tmp/log/udpxy}
+# 操作日志：放 /etc/zed-opota/ 是为了"固件刷新后仍在"——
+# 包内 /lib/upgrade/keep.d/zed-opota 声明了该文件，sysupgrade 保留配置刷机时
+# 会把它打进备份集并在新固件首启时还原；写入时自动截断到最多100行
+LOG_FILE=${OPOTA_LOG:-/etc/zed-opota/ota.log}
+LOG_MAX=100
 REPO="xylz0928/Openwrt-Make"
 IMG="openwrt-x86-64-generic-squashfs-combined-efi.img.gz"
 API="https://api.github.com/repos/${REPO}/releases/latest"
@@ -46,6 +51,19 @@ jesc() {
 # 拼接所有参数后输出一行（JSON 片段间的空格合法）
 emit() {
 	printf '%s\n' "$*"
+}
+
+# 追加一行操作日志并截断到最多 LOG_MAX 行；日志失败绝不影响业务动作
+log_line() {
+	local n tmp
+	mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null
+	printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null || return 0
+	n=$(wc -l < "$LOG_FILE" 2>/dev/null | tr -dc '0-9')
+	if [ "${n:-0}" -gt "$LOG_MAX" ]; then
+		tmp="$LOG_FILE.tmp"
+		tail -n "$LOG_MAX" "$LOG_FILE" > "$tmp" 2>/dev/null && mv "$tmp" "$LOG_FILE" 2>/dev/null
+	fi
+	return 0
 }
 
 # fail "消息" ["额外的JSON键值对"]
@@ -179,6 +197,7 @@ do_check() {
 	if static_probe; then st_ok=true; fi
 
 	if [ "$gh_ok" = false ] && [ "$st_ok" = false ]; then
+		log_line "检查更新[$sel]：双源均不可达（本地 ${local_v:-?}）"
 		fail "Zed-Github 与 Zed-NAS 均不可达（网络异常或 API 限流）"
 	fi
 
@@ -212,6 +231,18 @@ do_check() {
 		esac
 	fi
 
+	# 操作日志（≤100行；keep.d 声明 → 固件刷新后仍在）
+	remote=""
+	[ "$sel" = github ] && [ "$gh_ok" = true ] && remote=${GH_DATE:-}
+	[ "$sel" = static ] && [ "$st_ok" = true ] && remote=${ST_RDATE:-}
+	if [ "$selected_ok" = false ]; then
+		log_line "检查更新[$sel]：所选源不可达（本地 $local_v）"
+	elif [ "$upd" = true ]; then
+		log_line "检查更新[$sel]：发现新版本（$local_v → $remote）"
+	else
+		log_line "检查更新[$sel]：已是最新（$local_v，远端 $remote）"
+	fi
+
 	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${sel}\"," \
 		"\"selected_ok\":${selected_ok},\"has_update\":${upd}," \
 		"\"sources\":{" \
@@ -235,6 +266,8 @@ do_space() {
 	need=$((fw + cfg + MARGIN))
 	enough=false
 	[ "$free" -ge "$need" ] && enough=true
+
+	log_line "空间检查：固件 $fw + 配置 $cfg + 余量 $MARGIN = 需 $need / 可用 $free（够=$enough）"
 
 	emit "{\"ok\":true,\"fw\":${fw},\"cfg\":${cfg},\"margin\":${MARGIN}," \
 		"\"need\":${need},\"free\":${free},\"total\":${total},\"enough\":${enough}}"
@@ -283,6 +316,7 @@ do_download() {
 	total=$(tmp_total)
 	need=$((size + cfg + MARGIN))
 	if [ "$free" -lt "$need" ]; then
+		log_line "下载中止[$sel]：tmpfs 空间不足（需 $need / 可用 $free）"
 		emit "{\"ok\":false,\"error\":\"tmpfs 空间不足，无法下载固件\"," \
 			"\"code\":\"space\",\"fw\":${size},\"cfg\":${cfg},\"margin\":${MARGIN}," \
 			"\"need\":${need},\"free\":${free},\"total\":${total}}"
@@ -296,6 +330,7 @@ do_download() {
 	printf '%s' "$sel" > "$WORK/source"
 	printf '%s' "$size" > "$WORK/expected"
 	echo downloading > "$WORK/stage"
+	log_line "开始下载[$sel] $asset（$size 字节）"
 
 	# 后台下载 + 自动校验（liquid/pushbot 同款"子 shell &"模式，不阻塞 rpcd）
 	(
@@ -303,23 +338,28 @@ do_download() {
 		if ! curl -fsSL --retry 3 --max-time 600 -o "$WORK/sha256sums" "$sha_url"; then
 			if [ "$sel" = static ]; then
 				echo "Zed-NAS 未提供 sha256sums，无法校验，已中止下载" > "$WORK/err"
+				log_line "下载失败[$sel]：Zed-NAS 无 sha256sums，已中止"
 			else
 				echo "sha256sums 下载失败" > "$WORK/err"
+				log_line "下载失败[$sel]：sha256sums 获取失败"
 			fi
 			echo failed > "$WORK/stage"
 			exit 1
 		fi
 		if ! curl -fL --retry 3 --max-time 1800 -o "$WORK/$asset.part" "$img_url"; then
 			echo "固件下载失败" > "$WORK/err"
+			log_line "下载失败[$sel]：固件传输失败"
 			echo failed > "$WORK/stage"
 			exit 1
 		fi
 		mv "$WORK/$asset.part" "$WORK/$asset"
 		echo verifying > "$WORK/stage"
 		if verify_core; then
+			log_line "下载完成并 sha256 校验通过[$sel] $asset"
 			echo ready > "$WORK/stage"
 		else
 			echo "下载成功但固件校验失败" > "$WORK/err"
+			log_line "校验失败[$sel]：已删除产物 $asset"
 			rm -f "$WORK/$asset" "$WORK/sha256sums"
 			echo failed > "$WORK/stage"
 		fi
@@ -355,23 +395,26 @@ do_install() {
 	local asset fw test_out
 	asset=$(asset_get)
 	fw="$WORK/$asset"
-	[ -f "$fw" ] || fail "没有已下载的固件"
+	[ -f "$fw" ] || { log_line "刷机中止：没有已下载的固件"; fail "没有已下载的固件"; }
 
 	# 需求 2.2：执行更新前再次校验，不匹配则删除产物并明确提示
 	if ! verify_core; then
 		rm -f "$fw" "$WORK/sha256sums"
 		echo "下载成功但固件校验失败" > "$WORK/err"
 		echo failed > "$WORK/stage"
+		log_line "刷机中止：刷前二次校验失败，已删除产物 $asset"
 		fail "下载成功但固件校验失败，已删除固件产物"
 	fi
 
 	# 与官方 flash 页一致：先 --test 平台校验
 	if ! test_out=$(sysupgrade --test "$fw" 2>&1); then
 		printf '%s\n' "$test_out" > "$WORK/install.log"
+		log_line "刷机中止：sysupgrade --test 未通过（$asset）"
 		fail "sysupgrade 镜像校验未通过，未执行刷机"
 	fi
 
 	echo installing > "$WORK/stage"
+	log_line "开始刷机 $asset（校验与平台测试通过，保留配置，设备即将重启）"
 	(
 		sysupgrade -v "$fw" > "$WORK/install.log" 2>&1
 	) &
@@ -395,6 +438,7 @@ do_clean() {
 	esac
 
 	if [ ! -e "$f" ]; then
+		log_line "清理 $name：目标不存在"
 		emit "{\"ok\":true,\"freed\":0,\"target\":\"$(jesc "$1")\"," \
 			"\"msg\":\"${name} 不存在，已干净\"}"
 		exit 0
@@ -405,11 +449,27 @@ do_clean() {
 
 	# 关键：进程（clash / udpxy）持有句柄，rm 不释放空间 —— 原地清零截断
 	if : > "$f" 2>/dev/null; then
+		log_line "清理 $name：已清空，释放 $sz 字节"
 		emit "{\"ok\":true,\"freed\":${sz},\"target\":\"$(jesc "$1")\"," \
 			"\"msg\":\"${name} 已清空（原 ${sz} 字节），无需重启进程\"}"
 	else
+		log_line "清理 $name：清空失败（权限或只读）"
 		fail "${name} 清空失败（权限不足或文件系统只读）"
 	fi
+}
+
+# 输出操作日志（JSON 行数组；文件写入时已限100行）
+do_log() {
+	local out="" line
+	if [ ! -f "$LOG_FILE" ]; then
+		emit '{"ok":true,"lines":[],"msg":"暂无日志"}'
+		return 0
+	fi
+	while IFS= read -r line || [ -n "$line" ]; do
+		out="${out}\"$(jesc "$line")\","
+	done < "$LOG_FILE"
+	out="${out%,}"
+	emit "{\"ok\":true,\"lines\":[${out}]}"
 }
 
 # ---------- 入口 ----------
@@ -423,7 +483,8 @@ download)	do_download "${1:-0}" "${2:-github}" ;;
 progress)	do_progress ;;
 install)	do_install ;;
 clean)		do_clean "${1:-}" ;;
+log)		do_log ;;
 *)
-	emit '{"ok":false,"error":"用法: zed-opota check|space|download|progress|install|clean"}'
+	emit '{"ok":false,"error":"用法: zed-opota check|space|download|progress|install|clean|log"}'
 	;;
 esac

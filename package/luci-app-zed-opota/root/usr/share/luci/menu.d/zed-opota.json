@@ -48,5 +48,12 @@
 			"module": "luci.controller.opota",
 			"function": "act_clean"
 		}
+	},
+	"admin/system/opota/log": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_log"
+		}
 	}
 }

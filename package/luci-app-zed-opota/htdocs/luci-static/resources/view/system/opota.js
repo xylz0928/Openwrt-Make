@@ -61,6 +61,8 @@ var CSS = [
 	'#zed-opota .opota-result.is-err{background:rgba(69,10,10,.55);border-color:rgba(254,202,202,.6)}',
 	'#zed-opota .opota-result.is-ok{background:rgba(6,78,59,.45);border-color:rgba(167,243,208,.55)}',
 	'#zed-opota .opota-result.is-info{background:rgba(30,58,138,.45);border-color:rgba(147,197,253,.55)}',
+	'#zed-opota .opota-result.is-log{background:rgba(0,0,0,.45);border-color:rgba(255,255,255,.3);',
+	'  max-height:330px;overflow:auto;line-height:1.7}',
 	'#zed-opota .opota-btn-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}',
 	'#zed-opota .opota-btn-row.hidden{display:none}',
 	'#zed-opota .opota-btn{padding:6px 11px;border-radius:8px;border:1px solid rgba(255,255,255,.35);',
@@ -176,6 +178,7 @@ return view.extend({
 		var btnUdpxy = mkBtn('清理udpxy缓存', '', function() {
 			self.doClean('udpxy', 'udpxy 缓存');
 		});
+		var btnLog = mkBtn('查看日志', '', function() { self.doLog(); });
 
 		var btnUpdate = mkBtn('立即更新', 'important', function() { self.doUpdate(); });
 		btnUpdate.id = 'opota-btn-update';
@@ -190,7 +193,7 @@ return view.extend({
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
 			msg, sub, sources, srcPick, result,
 			E('div', { 'class': 'opota-btn-row' },
-				[btnCheck, btnSpace, btnSmart, btnUdpxy]),
+				[btnCheck, btnSpace, btnSmart, btnUdpxy, btnLog]),
 			updateRow
 		]);
 
@@ -241,7 +244,7 @@ return view.extend({
 		if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
 		r.className = 'opota-result show is-' + (cls || 'info');
 		r.textContent = msg;
-		if (cls !== 'err') {
+		if (cls === 'ok' || cls === 'info') {
 			resultTimer = setTimeout(function() { r.className = 'opota-result'; }, 10000);
 		}
 	},
@@ -396,6 +399,24 @@ return view.extend({
 			self.showResult(msg, 'ok');
 		}).catch(function(e) {
 			self.showResult('清理 ' + label + ' 失败：请求超时', 'err');
+		});
+	},
+
+	/* 操作日志（后端最多100行；keep.d 声明 → 固件刷新后仍在） */
+	doLog: function() {
+		var self = this;
+		if (busy) return;
+		api('log').then(function(d) {
+			if (!d || !d.ok) {
+				self.showResult('读取日志失败：' + ((d && d.error) || '未知错误'), 'err');
+				return;
+			}
+			var lines = d.lines || [];
+			self.showResult(lines.length
+				? ('操作日志（最近 ' + lines.length + ' 行，固件刷新后仍保留）\n' + lines.join('\n'))
+				: '暂无日志', 'log');
+		}).catch(function(e) {
+			self.showResult('读取日志失败：请求超时', 'err');
 		});
 	},
 
