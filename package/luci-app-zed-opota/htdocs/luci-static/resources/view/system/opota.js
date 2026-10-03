@@ -89,12 +89,37 @@ function api(name, params, timeoutMs) {
 	}
 	return new Promise(function(resolve, reject) {
 		var ctl = new AbortController();
-		/* check 需顺序探测双源（GitHub API + 静态站 + HEAD），放宽到 30s */
-		var timer = setTimeout(function() { ctl.abort(); }, timeoutMs || 15000);
+		var t = timeoutMs || 30000;
+		var timer = setTimeout(function() { ctl.abort(); }, t);
 		fetch(url, { signal: ctl.signal })
-			.then(function(r) { return r.json(); })
+			.then(function(r) {
+				return r.text().then(function(txt) {
+					var d;
+					try {
+						d = JSON.parse(txt);
+					} catch (e) {
+						var pe = new Error('响应不是JSON（HTTP ' + r.status + '）：'
+							+ String(txt).replace(/\s+/g, ' ').slice(0, 140));
+						pe.kind = 'parse';
+						throw pe;
+					}
+					if (!r.ok) {
+						var he = new Error('HTTP ' + r.status + (txt ? '：' + String(txt).replace(/\s+/g, ' ').slice(0, 100) : ''));
+						he.kind = 'http';
+						throw he;
+					}
+					return d;
+				});
+			})
 			.then(function(d) { clearTimeout(timer); resolve(d); })
-			.catch(function(e) { clearTimeout(timer); reject(e); });
+			.catch(function(e) {
+				clearTimeout(timer);
+				if (e && e.name === 'AbortError') {
+					var te = new Error('请求超时（>' + t + 's 未收到响应；服务端日志可对照是否实际完成）');
+					te.kind = 'timeout';
+					reject(te);
+				} else reject(e);
+			});
 	});
 }
 
@@ -354,17 +379,19 @@ return view.extend({
 		}).catch(function(e) {
 			self.setBusy(false);
 			self.setStatus('err', '检查失败');
-			self.showResult('检查更新失败：请求超时或两源均不可达', 'err');
+			self.showResult('检查更新失败：' + ((e && e.message) || '未知错误'), 'err');
 		});
 	},
 
 	doSpace: function() {
 		var self = this;
 		if (busy) return;
+		self.setBusy(true);
 		var size = (lastCheck && lastCheck.size) || 0;
 		self.hideResult();
 		self.showResult('正在测量 tmpfs 空间（含当前配置备份体积）…', 'info');
 		api('space', { size: size }).then(function(d) {
+			self.setBusy(false);
 			if (!d || !d.ok) {
 				self.showResult('空间检查失败：' + ((d && d.error) || '未知错误'), 'err');
 				return;
@@ -380,16 +407,19 @@ return view.extend({
 			if (d.enough) self.setStatus('latest', 'tmpfs 空间充足');
 			else self.setStatus('err', 'tmpfs 空间不足');
 		}).catch(function(e) {
-			self.showResult('空间检查失败：请求超时', 'err');
+			self.setBusy(false);
+			self.showResult('空间检查失败：' + ((e && e.message) || '未知错误'), 'err');
 		});
 	},
 
 	doClean: function(target, label) {
 		var self = this;
 		if (busy) return;
+		self.setBusy(true);
 		self.hideResult();
 		self.showResult('正在清理 ' + label + '…', 'info');
 		api('clean', { target: target }).then(function(d) {
+			self.setBusy(false);
 			if (!d || !d.ok) {
 				self.showResult('清理 ' + label + ' 失败：' + ((d && d.error) || '未知错误'), 'err');
 				return;
@@ -398,7 +428,8 @@ return view.extend({
 			if (d.freed > 0) msg += '（释放 ' + fmtBytes(d.freed) + '）';
 			self.showResult(msg, 'ok');
 		}).catch(function(e) {
-			self.showResult('清理 ' + label + ' 失败：请求超时', 'err');
+			self.setBusy(false);
+			self.showResult('清理 ' + label + ' 失败：' + ((e && e.message) || '未知错误'), 'err');
 		});
 	},
 
@@ -416,7 +447,7 @@ return view.extend({
 				? ('操作日志（最近 ' + lines.length + ' 行，固件刷新后仍保留）\n' + lines.join('\n'))
 				: '暂无日志', 'log');
 		}).catch(function(e) {
-			self.showResult('读取日志失败：请求超时', 'err');
+			self.showResult('读取日志失败：' + ((e && e.message) || '未知错误'), 'err');
 		});
 	},
 
@@ -451,7 +482,7 @@ return view.extend({
 		}).catch(function(e) {
 			self.setBusy(false);
 			self.setStatus('err', '下载失败');
-			self.showResult('下载启动失败：请求超时', 'err');
+			self.showResult('下载启动失败：' + ((e && e.message) || '未知错误'), 'err');
 		});
 	},
 
@@ -541,7 +572,7 @@ return view.extend({
 		}).catch(function(e) {
 			self.setBusy(false);
 			self.setStatus('err', '刷机未启动');
-			self.showResult('刷机未启动：请求超时', 'err');
+			self.showResult('刷机未启动：' + ((e && e.message) || '未知错误'), 'err');
 		});
 	},
 
