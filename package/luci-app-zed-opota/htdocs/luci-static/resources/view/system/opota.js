@@ -13,6 +13,7 @@
 'require dom';
 
 var lastCheck = null;	/* 最近一次 check 结果 */
+var autoFlash = false;	/* 立即更新=校验通过后自动进入刷机；拉取更新=false */
 var pollTimer = null;
 var resultTimer = null;
 var busy = false;
@@ -63,6 +64,15 @@ var CSS = [
 	'#zed-opota .opota-result.is-info{background:rgba(30,58,138,.45);border-color:rgba(147,197,253,.55)}',
 	'#zed-opota .opota-result.is-log{background:rgba(0,0,0,.45);border-color:rgba(255,255,255,.3);',
 	'  max-height:330px;overflow:auto;line-height:1.7}',
+	'#zed-opota .opota-logwrap{display:none;margin-top:12px;border-radius:10px;overflow:hidden;',
+	'  border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.45)}',
+	'#zed-opota .opota-logwrap.show{display:block}',
+	'#zed-opota .opota-loghead{font-size:11px;font-weight:700;padding:6px 12px;color:#e2e8f0;',
+	'  background:rgba(255,255,255,.12);display:flex;justify-content:space-between;align-items:center}',
+	'#zed-opota .opota-logbody{margin:0;padding:9px 12px;max-height:320px;overflow:auto;',
+	'  font-family:Menlo,Consolas,monospace;font-size:11.5px;line-height:1.75;white-space:pre-wrap;',
+	'  word-break:break-all;color:#e6edf3}',
+	'#zed-opota .opota-logbody.is-err{color:#fecaca}',
 	'#zed-opota .opota-btn-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}',
 	'#zed-opota .opota-btn-row.hidden{display:none}',
 	'#zed-opota .opota-btn{padding:6px 11px;border-radius:8px;border:1px solid rgba(255,255,255,.35);',
@@ -217,9 +227,14 @@ return view.extend({
 		var btnUdpxy = mkBtn('清理udpxy缓存', '', function() {
 			self.doClean('udpxy', 'udpxy 缓存');
 		});
+		var btnClearFw = mkBtn('清除固件缓存', '', function() {
+			self.doClean('fw', '固件缓存');
+		});
 		var btnLog = mkBtn('查看日志', '', function() { self.doLog(); });
 
-		var btnUpdate = mkBtn('立即更新', 'important', function() { self.doUpdate(); });
+		var btnUpdate = mkBtn('立即更新', 'important', function() { self.doUpdate(true); });
+		btnUpdate.id = 'opota-btn-update';
+		var btnPull = mkBtn('拉取更新', '', function() { self.doUpdate(false); });
 		btnUpdate.id = 'opota-btn-update';
 		var btnFlash = mkBtn('开始刷机', 'ready', function() { self.doInstall(); });
 		btnFlash.id = 'opota-btn-flash';
@@ -227,13 +242,25 @@ return view.extend({
 		var lnkDl = E('a', { 'class': 'opota-btn', 'id': 'opota-lnk-download',
 			'target': '_blank', 'rel': 'noopener', 'style': 'display:none' }, ['下载链接']);
 		var updateRow = E('div', { 'class': 'opota-btn-row hidden', 'id': 'opota-update-btns' },
-			[btnUpdate, btnFlash, lnkDl]);
+			[btnUpdate, btnPull, btnFlash, lnkDl]);
+
+		/* 独立日志输出窗（不与检查/空间/清理的结果窗共用） */
+		var logWrap = E('div', { 'class': 'opota-logwrap', 'id': 'opota-logwrap' }, [
+			E('div', { 'class': 'opota-loghead' }, [
+				E('span', {}, ['操作日志（≤100行 · 固件刷新后仍保留）']),
+				E('span', { 'id': 'opota-logstamp', 'style': 'opacity:.7;font-weight:400' }, [''])
+			]),
+			E('pre', { 'class': 'opota-logbody', 'id': 'opota-logbody' }, [''])
+		]);
 
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
-			msg, sub, sources, srcPick, result,
+			msg, sub, sources,
+			/* 更新操作紧贴版本输出（更靠近检查更新行） */
+			updateRow,
+			srcPick, result,
 			E('div', { 'class': 'opota-btn-row' },
-				[btnSpace, btnSmart, btnUdpxy, btnLog]),
-			updateRow
+				[btnSpace, btnSmart, btnUdpxy, btnClearFw, btnLog]),
+			logWrap
 		]);
 
 		var node = E('div', { 'class': 'cbi-section', 'id': 'zed-opota' }, [
@@ -428,7 +455,10 @@ return view.extend({
 				return;
 			}
 			var msg = 'tmpfs 空间检查\n'
-				+ '· 固件体积：' + fmtBytes(d.fw) + (size ? '' : '（未获取到，请先"检查更新"）') + '\n'
+				+ '· 固件体积：' + fmtBytes(d.fw)
+				+ (d.cached > 0
+					? '（本地已缓存 ' + fmtBytes(d.cached) + '，重下为原地替换，不重复计入需求）'
+					: (size ? '' : '（未获取到，请先"检查更新"）')) + '\n'
 				+ '· 配置备份：' + fmtBytes(d.cfg) + '\n'
 				+ '· 预留余量：' + fmtBytes(d.margin) + '\n'
 				+ '· 合计需要：' + fmtBytes(d.need) + '\n'
@@ -464,28 +494,42 @@ return view.extend({
 		});
 	},
 
-	/* 操作日志（后端最多100行；keep.d 声明 → 固件刷新后仍在） */
+	/* 操作日志 → 独立输出窗（开/关切换，刷新于窗口头显示） */
 	doLog: function() {
 		var self = this;
 		if (busy) return;
+		var wrap = $('opota-logwrap'), body = $('opota-logbody');
+		if (!wrap || !body) return;
+		/* 已打开 → 收起（不发请求） */
+		if (wrap.className.indexOf('show') >= 0) {
+			wrap.className = 'opota-logwrap';
+			return;
+		}
+		function show(content, err) {
+			body.className = 'opota-logbody' + (err ? ' is-err' : '');
+			body.textContent = content;
+			wrap.className = 'opota-logwrap show';
+			var stamp = $('opota-logstamp');
+			if (stamp) stamp.textContent = err ? '' : ('刷新于 ' + new Date().toTimeString().slice(0, 8));
+		}
 		api('log').then(function(d) {
 			if (!d || !d.ok) {
-				self.showResult('读取日志失败：' + ((d && d.error) || '未知错误'), 'err');
+				show('读取日志失败：' + ((d && d.error) || '未知错误'), true);
 				return;
 			}
 			var lines = d.lines || [];
-			self.showResult(lines.length
-				? ('操作日志（最近 ' + lines.length + ' 行，固件刷新后仍保留）\n' + lines.join('\n'))
-				: '暂无日志', 'log');
+			show(lines.length ? lines.join('\n') : '暂无日志', false);
 		}).catch(function(e) {
-			self.showResult('读取日志失败：' + ((e && e.message) || '未知错误'), 'err');
+			show('读取日志失败：' + ((e && e.message) || '未知错误'), true);
 		});
 	},
 
-	/* 立即更新：按所选源下载 → 自动 sha256 校验 → 待用户确认刷机 */
-	doUpdate: function() {
+	/* 更新动作：chain=true 立即更新（校验后自动进入刷机确认）
+	   chain=false 拉取更新（只下载+校验，停在已就绪，稍后手动刷） */
+	doUpdate: function(chain) {
 		var self = this;
 		if (busy) return;
+		autoFlash = !!chain;
 		var sel = selectedSource();
 		self.setBusy(true);
 		self.hideResult();
@@ -505,6 +549,7 @@ return view.extend({
 					self.setStatus('err', '下载失败');
 					self.showResult('下载启动失败：' + ((d && d.error) || '未知错误'), 'err');
 				}
+				autoFlash = false;
 				return;
 			}
 			self.setStatusRing('downloading', '正在下载固件（' + srcLabel(d.source) + '）…', 0);
@@ -512,6 +557,7 @@ return view.extend({
 			self.startPolling();
 		}).catch(function(e) {
 			self.setBusy(false);
+			autoFlash = false;
 			self.setStatus('err', '下载失败');
 			self.showResult('下载启动失败：' + ((e && e.message) || '未知错误'), 'err');
 		});
@@ -552,18 +598,25 @@ return view.extend({
 			}
 			self.setSub('');
 			break;
-		case 'ready':
+		case 'ready': {
 			self.stopPolling();
 			self.setBusy(false);
 			self.setStatus('ready', '固件已就绪，校验通过');
 			self.setSub(fmtBytes(d.total) + '　sha256 ✓');
-			self.showResult('点"开始刷机"写入固件（保留当前配置），过程请勿断电。', 'ok');
+			var chain = autoFlash;
+			autoFlash = false;
+			self.showResult(chain
+				? '校验通过，即将进入刷机确认（拉取更新模式则停在这里等你手动刷）。'
+				: '点"开始刷机"写入固件（保留当前配置），过程请勿断电。', 'ok');
 			self.showUpdateRow(true);
 			var ub = $('opota-btn-update');
 			if (ub) ub.style.display = 'none';
 			var fb = $('opota-btn-flash');
 			if (fb) { fb.style.display = ''; fb.disabled = false; }
+			/* 立即更新：校验通过后自动弹出刷机确认（仍需人工点确认） */
+			if (chain) setTimeout(function() { self.doInstall(); }, 500);
 			break;
+		}
 		case 'installing':
 			self.stopPolling();
 			self.setStatus('installing', '正在刷机，设备即将重启…');

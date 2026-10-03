@@ -62,10 +62,10 @@ return {
 	},
 
 	act_clean: function() {
-		/* 白名单：只允许清理已确认的两个缓存目标 */
+		/* 白名单：清理已确认的两个缓存目标 + 固件下载缓存 */
 		let t = http.formvalue("target") ?? "";
 
-		if (t != "smart" && t != "udpxy") {
+		if (t != "smart" && t != "udpxy" && t != "fw") {
 			http.prepare_content("application/json");
 			http.write('{"ok":false,"error":"未知清理目标"}');
 			return;

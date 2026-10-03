@@ -118,6 +118,17 @@ cfg_size() {
 	printf '%s' "${n:-0}"
 }
 
+# 工作区内已缓存的固件字节数（含 .part 半成品）：下载前会 rm -rf 工作区，
+# 即"原地替换"，净增空间为0 → 空间检查不得重复计入（需求2.3精化）
+cached_bytes() {
+	local n=0 f
+	for f in "$WORK"/*.img.gz "$WORK"/*.bin "$WORK"/*.part; do
+		[ -f "$f" ] || continue
+		n=$((n + $(wc -c < "$f" | tr -dc '0-9')))
+	done
+	printf '%s' "$n"
+}
+
 stage_get() {
 	cat "$WORK/stage" 2>/dev/null || printf 'idle'
 }
@@ -252,20 +263,27 @@ do_check() {
 }
 
 do_space() {
-	local fw cfg need free total enough
+	local fw cfg need free total enough cached cbytes
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
 
 	cfg=$(cfg_size)
+	cbytes=$(cached_bytes)
+	# 本地已缓存部分 = 原地替换，不重复计入需求
+	cached=0
+	if [ "$cbytes" -gt 0 ] && [ "$fw" -gt 0 ]; then
+		cached=$cbytes
+		[ "$cached" -gt "$fw" ] && cached=$fw
+	fi
 	free=$(tmp_free)
 	total=$(tmp_total)
-	need=$((fw + cfg + MARGIN))
+	need=$((fw - cached + cfg + MARGIN))
 	enough=false
 	[ "$free" -ge "$need" ] && enough=true
 
-	log_line "空间检查：固件 $fw + 配置 $cfg + 余量 $MARGIN = 需 $need / 可用 $free（够=$enough）"
+	log_line "空间检查：固件 $fw（本地已缓存 $cbytes，计减 $cached）+ 配置 $cfg + 余量 $MARGIN = 需 $need / 可用 $free（够=$enough）"
 
-	emit "{\"ok\":true,\"fw\":${fw},\"cfg\":${cfg},\"margin\":${MARGIN}," \
+	emit "{\"ok\":true,\"fw\":${fw},\"cached\":${cbytes},\"cfg\":${cfg},\"margin\":${MARGIN}," \
 		"\"need\":${need},\"free\":${free},\"total\":${total},\"enough\":${enough}}"
 }
 
@@ -308,13 +326,19 @@ do_download() {
 	[ "$fw" -gt 0 ] && size=$fw
 	[ "$size" -gt 0 ] || fail "无法获取固件体积，无法执行空间检查"
 	cfg=$(cfg_size)
+	cbytes=$(cached_bytes)
+	cached=0
+	if [ "$cbytes" -gt 0 ] && [ "$size" -gt 0 ]; then
+		cached=$cbytes
+		[ "$cached" -gt "$size" ] && cached=$size
+	fi
 	free=$(tmp_free)
 	total=$(tmp_total)
-	need=$((size + cfg + MARGIN))
+	need=$((size - cached + cfg + MARGIN))
 	if [ "$free" -lt "$need" ]; then
 		log_line "下载中止[$sel]：tmpfs 空间不足（需 $need / 可用 $free）"
 		emit "{\"ok\":false,\"error\":\"tmpfs 空间不足，无法下载固件\"," \
-			"\"code\":\"space\",\"fw\":${size},\"cfg\":${cfg},\"margin\":${MARGIN}," \
+			"\"code\":\"space\",\"fw\":${size},\"cached\":${cbytes},\"cfg\":${cfg},\"margin\":${MARGIN}," \
 			"\"need\":${need},\"free\":${free},\"total\":${total}}"
 		exit 0
 	fi
@@ -420,6 +444,16 @@ do_install() {
 do_clean() {
 	local f name sz
 	case "${1:-}" in
+	fw)
+		# 清除固件缓存：整个下载工作区（进度/校验文件一并复位）
+		sz=$(cached_bytes)
+		rm -rf "$WORK"
+		mkdir -p "$WORK"
+		log_line "清理 固件缓存：已清除，释放 $sz 字节"
+		emit "{\"ok\":true,\"freed\":${sz},\"target\":\"fw\"," \
+			"\"msg\":\"固件缓存已清除（释放 ${sz} 字节），可重新下载\"}"
+		exit 0
+		;;
 	smart)
 		f=$SMART_FILE
 		name="OpenClash Smart 缓存"
