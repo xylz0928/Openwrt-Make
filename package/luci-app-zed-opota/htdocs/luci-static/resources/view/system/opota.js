@@ -32,7 +32,7 @@ var CSS = [
 	'#zed-opota .opota-card.is-ready{background:linear-gradient(135deg,#14b8a6,#0d9488)}',
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
-	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;',
+	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;}',
 	'#zed-opota .opota-sub{margin-top:6px;font-size:12px;font-weight:500;opacity:.9;',
 	'  font-family:Menlo,Consolas,monospace;word-break:break-all}',
 	'#zed-opota .opota-ring{display:inline-block;width:18px;height:18px;flex-shrink:0}',
@@ -155,7 +155,8 @@ function esc(s) {
 function showModel(d) {
 	var el = $('opota-model');
 	if (!el || !d || !d.model) return;
-	el.textContent = '型号：' + d.model + (d.local ? '　固件：' + d.local : '');
+	/* 只显示型号；固件版本由下方"本地版本"行呈现，不重复 */
+	el.textContent = '型号：' + d.model;
 }
 
 /* LuCI 管理路径：L.env.admin_path 在部分构建上是 undefined（实机踩坑：
