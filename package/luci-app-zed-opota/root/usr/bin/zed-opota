@@ -31,7 +31,6 @@ UDPXY_FILE=${OPOTA_UDPXY_FILE:-/tmp/log/udpxy}
 LOG_FILE=${OPOTA_LOG:-/etc/zed-opota/ota.log}
 LOG_MAX=100
 REPO="xylz0928/Openwrt-Make"
-API_BASE="https://api.github.com/repos/${REPO}"
 MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
 
 # ---------------- 型号 profile（多型号 OTA） ----------------
@@ -188,12 +187,60 @@ local_ver() {
 	grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' "$RELEASE_FILE" 2>/dev/null | head -n1
 }
 
-release_json() {
-	curl_retry -sS --max-time 10 \
-		-H 'Accept: application/vnd.github+json' \
-		-H 'User-Agent: zed-opota' \
-		"${1:-$API_BASE/releases/latest}" 2>/dev/null
+# 固定版本文件（2026-10-04 用户指令：前端与后端【都直接读它】取本固件最后一次
+# 成功编译日期，不再经过任何 api.github.com）：由各 workflow 编译成功后写回
+LB_URL="https://raw.githubusercontent.com/${REPO}/main/last_build.txt"
+
+# 产品线 → 版本文件行键
+profile_key() {
+	case "$PROFILE" in
+	x86-efi) echo "x86_Official" ;;
+	360t7-108m) echo "MT7981" ;;
+	*) return 1 ;;
+	esac
 }
+
+# 读版本文件并解析本型号行（KEY=日期 [资产体积 构建时间]；跳过注释，兼容 =/: 分隔）
+# 成功设置 GH_TAG/GH_DATE/GH_IMG_URL/GH_SHA_URL/GH_SIZE/GH_PUB，返回 0
+lb_probe() {
+	local key out date size pub
+	key=$(profile_key) || return 1
+	out=$(curl_retry -fsSL --max-time 8 "$LB_URL" 2>/dev/null | awk -v k="$key" '
+		{
+			t = $0
+			sub(/^[ \t]+/, "", t)
+			if (substr(t, 1, 1) == "#") next
+			i = index(t, "=")
+			j = index(t, ":")
+			p = (i > 0 && (j == 0 || i < j)) ? i : j
+			if (p == 0) next
+			key = substr(t, 1, p - 1)
+			gsub(/[ \t]/, "", key)
+			if (key != k) next
+			rest = substr(t, p + 1)
+			sub(/^[ \t]+/, "", rest)
+			n = split(rest, a, /[ \t]+/)
+			if (n >= 1 && a[1] ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) {
+				print a[1]
+				if (n >= 2) print a[2]
+				if (n >= 3) print a[3]
+				exit
+			}
+		}')
+	[ -n "$out" ] || return 1
+	date=$(printf '%s' "$out" | sed -n 1p)
+	[ -n "$date" ] || return 1
+	size=$(printf '%s' "$out" | sed -n 2p)
+	pub=$(printf '%s' "$out" | sed -n 3p)
+	GH_TAG="${TAG_PREFIX}R${date}"
+	GH_DATE="R${date}"
+	GH_IMG_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/${IMG}"
+	GH_SHA_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/sha256sums"
+	case "$size" in ''|*[!0-9]*) GH_SIZE=0 ;; *) GH_SIZE=$size ;; esac
+	GH_PUB=${pub:-}
+	return 0
+}
+
 
 # HEAD 获取远端固件字节数（stdout 数字），失败输出 0
 remote_size() {
@@ -257,9 +304,8 @@ valid_tag() {
 	esac
 }
 
-# 由前端传来的 tag 直接构造 GitHub 下载地址。
-# 关键：全程不调 api.github.com（查询由浏览器完成）——github.com 直链无配额，
-# 路由器出口 IP 从此不消耗 API 额度
+# 由显式 tag（CLI/前端透传）直接构造 GitHub 下载地址；无 tag 时走 lb_probe 读固定文件。
+# 两路都不碰 api.github.com：github.com 直链无配额，路由器出口零 API 消耗
 gh_from_tag() {
 	valid_tag "$1" || return 1
 	GH_TAG=$1
@@ -276,39 +322,6 @@ gh_from_tag() {
 # Zed-Github：取发布列表中第一条【本产品前缀】且带 R 日期的 tag
 # （CLI/调试路径：仅在未传 tag 时使用；浏览器流程不会走这里）
 # （同仓库多产品共存：releases/latest 可能是另一产品的 tag，必须按前缀过滤）
-gh_probe() {
-	local json line
-	json=$(release_json "${API_BASE}/releases?per_page=30")
-	[ -n "$json" ] || return 1
-	# 前缀 + R 日期匹配全在 awk 内完成（POSIX 安全：不用进程替换/数组）
-	GH_TAG=$(printf '%s' "$json" | awk -v pfx="$TAG_PREFIX" '
-		/"tag_name"/ {
-			s = $0
-			sub(/.*"tag_name": "/, "", s)
-			sub(/".*/, "", s)
-			if (index(s, pfx) == 1 && s ~ /R[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/)
-				print s
-		}' | head -n1)
-	[ -n "$GH_TAG" ] || return 1
-	GH_DATE=$(printf '%s' "$GH_TAG" | grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
-	[ -n "$GH_DATE" ] || return 1
-	GH_IMG_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/${IMG}"
-	GH_SHA_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/sha256sums"
-	GH_SIZE=$(remote_size "$GH_IMG_URL")
-	case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
-	# HEAD 拿不到体积（路由器侧 github 常超时/无 content-length）→
-	# 从刚取的 releases 列表里按【本 tag 对象内】的资产名抽 size 字段（零额外请求）
-	if [ "$GH_SIZE" = 0 ]; then
-		GH_SIZE=$(printf '%s' "$json" | awk -v tgt="$GH_TAG" -v a="$IMG" '
-			/"tag_name": "/ { s = $0; sub(/.*"tag_name": "/, "", s); sub(/".*/, "", s); want = (s == tgt) }
-			want && /"name": "/ { s = $0; sub(/.*"name": "/, "", s); sub(/".*/, "", s); last = s }
-			want && /"size": / { if (last == a) { s = $0; sub(/.*"size": /, "", s); sub(/,.*/, "", s); if (s ~ /^[0-9]+$/) { print s; exit } } }')
-		case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
-	fi
-	GH_PUB=$(release_json "${API_BASE}/releases/tags/${GH_TAG}" | jsonfilter -e '@.published_at' 2>/dev/null)
-	GH_PUB=${GH_PUB:-}
-	return 0
-}
 
 # Zed-NAS：静态站（成功设置 ST_* 全局，返回 0）
 static_probe() {
@@ -382,7 +395,8 @@ do_check() {
 		if [ -n "${2:-}" ]; then
 			# 前端已查询到 tag（pushbot 模式：检查由浏览器发起）→ 零 API 构造
 			if gh_from_tag "$2"; then gh_ok=true; fi
-		elif gh_probe; then
+		elif lb_probe; then
+			# 后端直接读固定版本文件（零 api）
 			gh_ok=true
 		fi
 		# 浏览器 API 顺带带回的体积优先（路由器侧 HEAD github 常超时/拿不到
@@ -492,11 +506,11 @@ do_download() {
 
 	# 按用户所选源取地址（不可达即报错，不偷偷换源）
 	if [ "$sel" = github ]; then
-		# 带 tag（浏览器流程）→ 直连构造；不带（CLI）→ gh_probe 兜底
+		# 显式 tag（CLI）→ 直接构造；否则后端直读固定版本文件（零 api）
 		if [ -n "${3:-}" ]; then
 			gh_from_tag "$3" || fail "非法的固件版本标识"
-		elif ! gh_probe; then
-			fail "所选固件源（Zed-Github）不可达，请切换固件源后重试"
+		elif ! lb_probe; then
+			fail "Zed-Github 版本文件不可达（last_build.txt 读取失败），可切换 Zed-NAS"
 		fi
 		asset=$IMG
 		img_url=$GH_IMG_URL
@@ -702,7 +716,7 @@ do_log() {
 # 只做 HEAD 连通性：github.com 主站（不耗 API 配额）+ 静态站固件头
 do_diag() {
 	local gh=false st=false
-	if curl -sI --max-time 5 -o /dev/null "https://github.com/" 2>/dev/null; then
+	if curl -sI --max-time 5 -o /dev/null "$LB_URL" 2>/dev/null; then
 		gh=true
 	fi
 	if [ -n "$STATIC_IMG_URL" ] && curl -sI --max-time 5 -o /dev/null "$STATIC_IMG_URL" 2>/dev/null; then

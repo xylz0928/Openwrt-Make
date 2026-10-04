@@ -49,6 +49,9 @@ env:
 
 jobs:
   build:
+    # 允许用 GITHUB_TOKEN 回写仓库文件（last_build.txt）
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
 
     steps:
@@ -338,6 +341,34 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
         
+
+    # OTA last_build.txt 写回（浏览器 raw 免配额直读；编译+发版全成功才写，写回失败不阻断发版）
+    - name: Update last_build.txt (x86_Official)
+      if: success() && env.UPLOAD_RELEASE == 'true' && steps.otafiles.outcome == 'success'
+      continue-on-error: true
+      run: |
+        # 版本日期与 tag 步同源：CONFIG_VERSION_NUMBER 里的 R 日期（CST 盖章值，非 date 现算）
+        VER=$(grep '^CONFIG_VERSION_NUMBER=' openwrt/.config | sed -E 's/.*"R([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' || true)
+        if ! echo "$VER" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+          echo "::error::无法解析固件版本日期，跳过 last_build.txt"
+          exit 1
+        fi
+        DATE="$VER"
+        SIZE=$("$FIRMWARE/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" 2>/dev/null || echo 0)
+        PUB=$(date -u +%FT%TZ)
+        LINE="x86_Official=$DATE $SIZE $PUB"
+        if [ -f last_build.txt ]; then
+          awk -v k="x86_Official=" -v l="$LINE" 'index($0,k)==1{print l;f=1;next} {print} END{if(!f)print l}' last_build.txt > last_build.txt.tmp && mv last_build.txt.tmp last_build.txt
+        else
+          printf '%s\n' "$LINE" > last_build.txt
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add last_build.txt
+        if git diff --cached --quiet; then echo "last_build.txt 已是最新"; exit 0; fi
+        git commit -m "chore(ota): update last_build x86_Official=$DATE"
+        git pull --rebase origin "${GITHUB_REF_NAME}"
+        git push origin "HEAD:${GITHUB_REF_NAME}"
     - name: Upload firmware to my NAS
       id: zz-nas
       if: steps.organize.outputs.status == 'success' && env.UPLOAD_ZZNAS == 'true' && !cancelled()

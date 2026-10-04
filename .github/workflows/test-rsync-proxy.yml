@@ -46,12 +46,33 @@ env:
 
 jobs:
   build:
+    # 允许用 GITHUB_TOKEN 回写仓库文件（last_build.txt）
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@main
 
+
+    # OTA last_build.txt 写回验证（Test 行；本 workflow 无编译产物，故默认直接执行本步）
+    - name: Update last_build.txt (Test write-back)
+      run: |
+        DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+        LINE="Test=$DATE"
+        if [ -f last_build.txt ]; then
+          awk -v k="Test=" -v l="$LINE" 'index($0,k)==1{print l;f=1;next} {print} END{if(!f)print l}' last_build.txt > last_build.txt.tmp && mv last_build.txt.tmp last_build.txt
+        else
+          printf '%s\n' "$LINE" > last_build.txt
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add last_build.txt
+        if git diff --cached --quiet; then echo "last_build.txt 已是最新"; exit 0; fi
+        git commit -m "chore(ota): update last_build Test=$DATE"
+        git pull --rebase origin "${{GITHUB_REF_NAME}}"
+        git push origin "HEAD:${{GITHUB_REF_NAME}}"
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
