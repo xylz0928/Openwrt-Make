@@ -209,6 +209,10 @@ function browserReach(url) {
 var GH_REPO = 'xylz0928/Openwrt-Make';
 var GH_API = 'https://api.github.com/repos/' + GH_REPO + '/releases?per_page=30';
 var GH_PREFIX = { 'x86-efi': 'OP_x86_Official_', '360t7-108m': 'OP_MT7981_' };
+var GH_ASSET = {
+	'x86-efi': 'openwrt-x86-64-generic-squashfs-combined-efi.img.gz',
+	'360t7-108m': 'immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin'
+};
 var GH_TTL = 300000;
 var cachedProfile = null;
 var lastGhTag = '';
@@ -251,7 +255,20 @@ function ghDiscover(profile) {
 			for (var i = 0; i < list.length; i++) {
 				var t = list[i] && list[i].tag_name;
 				if (t && pat.test(t)) {
-					hit = { tag: t, published: list[i].published_at || '', ts: Date.now() };
+					hit = { tag: t, published: list[i].published_at || '', size: 0, digest: '', ts: Date.now() };
+					/* 同一份响应里就有资产体积（浏览器顺带取回，零额外请求；
+					   路由器侧 HEAD github 常拿不到 → 检查时把体积一起带回去） */
+					var want = GH_ASSET[profile];
+					var assets = list[i].assets;
+					if (want && assets && assets.length) {
+						for (var j = 0; j < assets.length; j++) {
+							if (assets[j] && assets[j].name === want) {
+								hit.size = assets[j].size || 0;
+								hit.digest = assets[j].digest || '';
+								break;
+							}
+						}
+					}
 					break;
 				}
 			}
@@ -547,9 +564,10 @@ return view.extend({
 					renderDiag();
 					self._ghInfo = info;
 					lastGhTag = info.tag || '';
-					return api('check', info.tag
-						? { source: 'github', tag: info.tag }
-						: { source: 'github' }, 30000);
+					var cq = { source: 'github' };
+					if (info.tag) cq.tag = info.tag;
+					if (info.size > 0) cq.size = info.size;
+					return api('check', cq, 30000);
 				}).catch(function(err) {
 					diagState.browser = shortDiagReason(err);
 					diagState.note = '（浏览器侧失败，本次由路由器代查）';
@@ -577,6 +595,13 @@ return view.extend({
 			if (d.active === 'github' && d.sources && d.sources.github
 				&& d.sources.github.ok && d.sources.github.tag)
 				lastGhTag = d.sources.github.tag;
+
+			/* 兜底：后端 HEAD 体积为0 时，用浏览器发现的体积回填（空间检查/下载都靠它） */
+			if (d.active === 'github' && self._ghInfo && self._ghInfo.size > 0) {
+				if (!d.size) d.size = self._ghInfo.size;
+				if (d.sources && d.sources.github && !d.sources.github.size)
+					d.sources.github.size = self._ghInfo.size;
+			}
 
 			/* 静态源：补一次浏览器侧连通性探测（no-cors） */
 			if (d.active === 'static' && d.img_url && d.selected_ok && !diagState.browser) {

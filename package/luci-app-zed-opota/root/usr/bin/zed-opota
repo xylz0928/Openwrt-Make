@@ -296,6 +296,15 @@ gh_probe() {
 	GH_SHA_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/sha256sums"
 	GH_SIZE=$(remote_size "$GH_IMG_URL")
 	case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
+	# HEAD 拿不到体积（路由器侧 github 常超时/无 content-length）→
+	# 从刚取的 releases 列表里按【本 tag 对象内】的资产名抽 size 字段（零额外请求）
+	if [ "$GH_SIZE" = 0 ]; then
+		GH_SIZE=$(printf '%s' "$json" | awk -v tgt="$GH_TAG" -v a="$IMG" '
+			/"tag_name": "/ { s = $0; sub(/.*"tag_name": "/, "", s); sub(/".*/, "", s); want = (s == tgt) }
+			want && /"name": "/ { s = $0; sub(/.*"name": "/, "", s); sub(/".*/, "", s); last = s }
+			want && /"size": / { if (last == a) { s = $0; sub(/.*"size": /, "", s); sub(/,.*/, "", s); if (s ~ /^[0-9]+$/) { print s; exit } } }')
+		case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
+	fi
 	GH_PUB=$(release_json "${API_BASE}/releases/tags/${GH_TAG}" | jsonfilter -e '@.published_at' 2>/dev/null)
 	GH_PUB=${GH_PUB:-}
 	return 0
@@ -376,6 +385,12 @@ do_check() {
 		elif gh_probe; then
 			gh_ok=true
 		fi
+		# 浏览器 API 顺带带回的体积优先（路由器侧 HEAD github 常超时/拿不到
+		# content-length 导致 size=0，空间检查会显示"未获取到"）
+		case "${3:-}" in
+		''|*[!0-9]*) ;;
+		*) [ "${3:-0}" -gt 0 ] && GH_SIZE=$3 ;;
+		esac
 	else
 		st_checked=true
 		if static_probe; then st_ok=true; fi
@@ -701,7 +716,7 @@ cmd=${1:-}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
-check)		do_check "${1:-}" "${2:-}" ;;
+check)		do_check "${1:-}" "${2:-}" "${3:-}" ;;
 diag)		do_diag ;;
 space)		do_space "${1:-0}" ;;
 download)	do_download "${1:-0}" "${2:-}" "${3:-}" ;;

@@ -34,6 +34,13 @@ function digits(v) {
 
 /* 固件源白名单（Zed-Github | Zed-NAS）；缺省返回空串 =
    交由后端按型号默认源决定（x86=GitHub，360T7=Zed-NAS） */
+/* 浏览器 API 顺带带回的资产体积（字节，纯数字白名单） */
+function size_param() {
+	let v = http.formvalue("size") ?? "";
+	if (match(v, /^[0-9]{1,12}$/)) return v;
+	return "";
+}
+
 /* 前端浏览器查询 GitHub 后带回的 release tag（严格字符白名单，格式由后端二次校验）
    —— pushbot 模式：检查由浏览器发起，路由器不再自己调 api.github.com（零配额） */
 function tag_param() {
@@ -60,6 +67,8 @@ return {
 		if (t != "") {
 			if (s == "") a += " github";
 			a += " " + t;
+			let z = size_param();
+			if (z != "") a += " " + z;
 		}
 		relay(a);
 	},
