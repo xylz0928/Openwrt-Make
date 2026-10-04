@@ -38,8 +38,11 @@ function digits(v) {
    —— pushbot 模式：检查由浏览器发起，路由器不再自己调 api.github.com（零配额） */
 function tag_param() {
 	let t = http.formvalue("tag") ?? "";
-	if (t.length == 0 || t.length > 64) return "";
-	return (t.match(/^[A-Za-z0-9._-]+$/) ? t : "");
+	/* ucode 正确原语：字符串没有 .length/.match 属性（会抛 Reference error
+	   导致 dispatcher 500，2026-10-04 实机踩坑）；且这版 ucode 的 ~ 运算符
+	   会段错误——只用全局 length()/match()（设备实测可用） */
+	if (length(t) == 0 || length(t) > 64) return "";
+	return (match(t, /^[A-Za-z0-9._-]+$/) ? t : "");
 }
 
 function src_param() {
