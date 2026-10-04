@@ -33,7 +33,7 @@ var CSS = [
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
 	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;}',
-	'#zed-opota .opota-diag{display:none;margin-top:5px;font-size:11px;line-height:1.65;opacity:.86;word-break:break-all}',
+	'#zed-opota .opota-diag{display:none;margin-top:5px;font-size:11px;line-height:1.7;opacity:.86;word-break:break-all;white-space:pre-line}',
 	'#zed-opota .opota-diag.show{display:block}',
 	'#zed-opota .opota-sub{margin-top:6px;font-size:12px;font-weight:500;opacity:.9;',
 	'  font-family:Menlo,Consolas,monospace;word-break:break-all}',
@@ -164,10 +164,11 @@ function renderDiag() {
 	if (!el) return;
 	var parts = [];
 	if (diagState.browser) parts.push('浏览器侧：' + diagState.browser);
-	if (diagState.router) parts.push('路由器侧：' + diagState.router);
+	if (diagState.router)
+		parts.push('路由器侧：' + diagState.router + (diagState.note ? '　' + diagState.note : ''));
 	if (!parts.length) { el.textContent = ''; el.className = 'opota-diag'; return; }
 	el.className = 'opota-diag show';
-	el.textContent = '来源检测 · ' + parts.join(' · ') + (diagState.note ? '　' + diagState.note : '');
+	el.textContent = parts.join('\n');
 }
 
 function diagReset() {
@@ -569,10 +570,19 @@ return view.extend({
 					if (info.size > 0) cq.size = info.size;
 					return api('check', cq, 30000);
 				}).catch(function(err) {
+					/* 浏览器侧失败 → 回退后端代查；仅代查【成功】才标注，
+					   两个都失败时不写"由路由器代查"（用户2026-10-04反馈） */
 					diagState.browser = shortDiagReason(err);
-					diagState.note = '（浏览器侧失败，本次由路由器代查）';
+					diagState.note = '';
 					renderDiag();
-					return api('check', { source: 'github' }, 30000);
+					return api('check', { source: 'github' }, 30000).then(function(fd) {
+						/* 只有代查【真拿到结果】才标注；后端也探测失败时不写 */
+						if (fd && fd.ok && fd.selected_ok) {
+							diagState.note = '（浏览器侧失败，本次由路由器代查）';
+							renderDiag();
+						}
+						return fd;
+					});
 				});
 			});
 		} else {
