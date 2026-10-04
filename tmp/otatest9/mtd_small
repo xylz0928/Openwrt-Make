@@ -1,0 +1,2 @@
+dev:    size   erasesize  name
+mtd4: 04800000 00020000 "ubi"

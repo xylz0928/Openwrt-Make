@@ -1,0 +1,4 @@
+dev:    size   erasesize  name
+mtd0: 00100000 00020000 "bl2"
+mtd4: 06c00000 00020000 "ubi"
+mtd5: 00100000 00020000 "config"

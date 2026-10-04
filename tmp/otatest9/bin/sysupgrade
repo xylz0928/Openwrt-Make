@@ -1,0 +1,3 @@
+#!/bin/sh
+[ "$1" = "-b" ] && { head -c 2048 /dev/zero > "$2"; }
+exit 0

@@ -1,0 +1,42 @@
+#!/bin/sh
+echo x >> /tmp/curlcount
+# FAKE_CURL_FAILN=前N次调用失败（按计数文件）
+CNT_FILE=/tmp/otatest9_curl_cnt
+n=$(cat "$CNT_FILE" 2>/dev/null || echo 0)
+if [ "${FAKE_CURL_FAILN:-0}" -gt 0 ]; then
+  if [ "$n" -lt "${FAKE_CURL_FAILN}" ]; then
+    echo $((n + 1)) > "$CNT_FILE"
+    [ "$n" -eq 0 ] && echo "curl: (6) Could not resolve host: static.z.7ze.top" >&2
+    exit 6
+  fi
+  echo $((n + 1)) > "$CNT_FILE"
+fi
+ishead=0; isout=0; out=""; url=""; nextout=0
+for a in "$@"; do
+  if [ $nextout -eq 1 ]; then out=$a; nextout=0; continue; fi
+  case "$a" in -o) nextout=1; isout=1;; http*|https*) url=$a;; -*) case "$a" in *I*|*-I*) ishead=1;; esac;; esac
+done
+case "$url" in
+  "https://github.com/") exit "${FAKE_GH_ROOT_RC:-0}";;
+esac
+case "$url" in
+  *api.github.com*) echo x >> /tmp/otatest9_apis 2>/dev/null || :;;
+esac
+case "$url" in
+  *"/releases?per_page"*) printf '%s\n' "${FAKE_RELEASES:-}"; exit 0;;
+  *"/releases/tags/"*) printf '%s' "${FAKE_TAG_JSON:-}"; exit 0;;
+  *build_date*) printf '%s' "${FAKE_ST_DATE:-2026-10-03}"; exit 0;;
+esac
+if [ $ishead -eq 1 ]; then printf 'content-length: %s\r\n' "${FAKE_SIZE:-0}" > "${out:-/dev/stdout}"; exit 0; fi
+case "$url" in
+  *last_build.txt*)
+    [ "${FAKE_LB_RC:-0}" != "0" ] && exit "$FAKE_LB_RC"
+    if [ $ishead -eq 1 ]; then printf 'content-length: %s\r\n' "${#FAKE_LB}" > "${out:-/dev/stdout}"; exit 0; fi
+    printf '%s' "${FAKE_LB:-}"; exit 0;;
+esac
+case "$url" in
+  *sha256sums*) printf '%s' "${FAKE_ST_SHA:-}" > "$out";;
+  *static.z*) printf '%s' "${FAKE_ST_IMG:-}" > "$out";;
+  *) printf '%s' "${FAKE_FW:-}" > "$out";;
+esac
+exit 0

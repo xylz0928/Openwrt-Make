@@ -1,0 +1,449 @@
+++ dirname ./defconfig_repro.sh
++ cd .
++ rm -rf owrt
++ git clone --depth 1 https://github.com/openwrt/openwrt owrt
+正克隆到 'owrt'...
++ cd owrt
++ ./scripts/feeds update -a
+Updating feed 'packages' from 'https://git.openwrt.org/feed/packages.git' ...
+正克隆到 './feeds/packages'...
+Updating feed 'luci' from 'https://git.openwrt.org/project/luci.git' ...
+正克隆到 './feeds/luci'...
+Updating feed 'routing' from 'https://git.openwrt.org/feed/routing.git' ...
+正克隆到 './feeds/routing'...
+Updating feed 'telephony' from 'https://git.openwrt.org/feed/telephony.git' ...
+正克隆到 './feeds/telephony'...
+Updating feed 'video' from 'https://github.com/openwrt/video.git' ...
+正克隆到 './feeds/video'...
+Create index file './feeds/packages.index' 
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... updated.
+Checking 'working-gcc'... ok.
+Checking 'g++'... updated.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... updated.
+Checking 'rsync'... updated.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... updated.
+Checking 'find'... updated.
+Checking 'bash'... updated.
+Checking 'xargs'... updated.
+Checking 'patch'... updated.
+Checking 'diff'... updated.
+Checking 'cp'... updated.
+Checking 'seq'... updated.
+Checking 'awk'... failed.
+Checking 'grep'... updated.
+Checking 'egrep'... updated.
+Checking 'getopt'... updated.
+Checking 'realpath'... updated.
+Checking 'stat'... updated.
+Checking 'gzip'... updated.
+Checking 'unzip'... updated.
+Checking 'bzip2'... updated.
+Checking 'wget'... updated.
+Checking 'install'... updated.
+Checking 'perl'... updated.
+Checking 'python'... updated.
+Checking 'python3'... updated.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... updated.
+Checking 'which'... updated.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+gmake: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212：/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] 错误 1
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting package info: merging...Collecting package info: done
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting target info: merging...Collecting target info: done
+Create index file './feeds/luci.index' 
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... ok.
+Checking 'working-gcc'... ok.
+Checking 'g++'... ok.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... ok.
+Checking 'rsync'... ok.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... ok.
+Checking 'find'... ok.
+Checking 'bash'... ok.
+Checking 'xargs'... ok.
+Checking 'patch'... ok.
+Checking 'diff'... ok.
+Checking 'cp'... ok.
+Checking 'seq'... ok.
+Checking 'awk'... failed.
+Checking 'grep'... ok.
+Checking 'egrep'... ok.
+Checking 'getopt'... ok.
+Checking 'realpath'... ok.
+Checking 'stat'... ok.
+Checking 'gzip'... ok.
+Checking 'unzip'... ok.
+Checking 'bzip2'... ok.
+Checking 'wget'... ok.
+Checking 'install'... ok.
+Checking 'perl'... ok.
+Checking 'python'... ok.
+Checking 'python3'... ok.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... ok.
+Checking 'which'... ok.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+gmake: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212：/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] 错误 1
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting package info: merging...Collecting package info: done
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting target info: merging...Collecting target info: done
+Create index file './feeds/routing.index' 
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... ok.
+Checking 'working-gcc'... ok.
+Checking 'g++'... ok.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... ok.
+Checking 'rsync'... ok.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... ok.
+Checking 'find'... ok.
+Checking 'bash'... ok.
+Checking 'xargs'... ok.
+Checking 'patch'... ok.
+Checking 'diff'... ok.
+Checking 'cp'... ok.
+Checking 'seq'... ok.
+Checking 'awk'... failed.
+Checking 'grep'... ok.
+Checking 'egrep'... ok.
+Checking 'getopt'... ok.
+Checking 'realpath'... ok.
+Checking 'stat'... ok.
+Checking 'gzip'... ok.
+Checking 'unzip'... ok.
+Checking 'bzip2'... ok.
+Checking 'wget'... ok.
+Checking 'install'... ok.
+Checking 'perl'... ok.
+Checking 'python'... ok.
+Checking 'python3'... ok.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... ok.
+Checking 'which'... ok.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+gmake: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212：/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] 错误 1
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting package info: merging...Collecting package info: done
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting target info: merging...Collecting target info: done
+Create index file './feeds/telephony.index' 
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... ok.
+Checking 'working-gcc'... ok.
+Checking 'g++'... ok.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... ok.
+Checking 'rsync'... ok.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... ok.
+Checking 'find'... ok.
+Checking 'bash'... ok.
+Checking 'xargs'... ok.
+Checking 'patch'... ok.
+Checking 'diff'... ok.
+Checking 'cp'... ok.
+Checking 'seq'... ok.
+Checking 'awk'... failed.
+Checking 'grep'... ok.
+Checking 'egrep'... ok.
+Checking 'getopt'... ok.
+Checking 'realpath'... ok.
+Checking 'stat'... ok.
+Checking 'gzip'... ok.
+Checking 'unzip'... ok.
+Checking 'bzip2'... ok.
+Checking 'wget'... ok.
+Checking 'install'... ok.
+Checking 'perl'... ok.
+Checking 'python'... ok.
+Checking 'python3'... ok.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... ok.
+Checking 'which'... ok.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+gmake: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212：/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] 错误 1
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting package info: merging...Collecting package info: done
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting target info: merging...Collecting target info: done
+Create index file './feeds/video.index' 
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... ok.
+Checking 'working-gcc'... ok.
+Checking 'g++'... ok.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... ok.
+Checking 'rsync'... ok.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... ok.
+Checking 'find'... ok.
+Checking 'bash'... ok.
+Checking 'xargs'... ok.
+Checking 'patch'... ok.
+Checking 'diff'... ok.
+Checking 'cp'... ok.
+Checking 'seq'... ok.
+Checking 'awk'... failed.
+Checking 'grep'... ok.
+Checking 'egrep'... ok.
+Checking 'getopt'... ok.
+Checking 'realpath'... ok.
+Checking 'stat'... ok.
+Checking 'gzip'... ok.
+Checking 'unzip'... ok.
+Checking 'bzip2'... ok.
+Checking 'wget'... ok.
+Checking 'install'... ok.
+Checking 'perl'... ok.
+Checking 'python'... ok.
+Checking 'python3'... ok.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... ok.
+Checking 'which'... ok.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+gmake: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212：/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] 错误 1
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting package info: merging...Collecting package info: done
+awk: include/scan.awk: line 21: function asort never defined
+awk: include/scan.awk: line 21: function asort never defined
+Collecting target info: merging...Collecting target info: done
++ ./scripts/feeds install -a
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... ok.
+Checking 'working-gcc'... ok.
+Checking 'g++'... ok.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... ok.
+Checking 'rsync'... ok.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... ok.
+Checking 'find'... ok.
+Checking 'bash'... ok.
+Checking 'xargs'... ok.
+Checking 'patch'... ok.
+Checking 'diff'... ok.
+Checking 'cp'... ok.
+Checking 'seq'... ok.
+Checking 'awk'... failed.
+Checking 'grep'... ok.
+Checking 'egrep'... ok.
+Checking 'getopt'... ok.
+Checking 'realpath'... ok.
+Checking 'stat'... ok.
+Checking 'gzip'... ok.
+Checking 'unzip'... ok.
+Checking 'bzip2'... ok.
+Checking 'wget'... ok.
+Checking 'install'... ok.
+Checking 'perl'... ok.
+Checking 'python'... ok.
+Checking 'python3'... ok.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... ok.
+Checking 'which'... ok.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+gmake[1]: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212: /home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] Error 1
+gmake: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:102：prepare-tmpinfo] 错误 2
+Cannot open './tmp/.packageinfo': No such file or directory
+Can't open file './tmp/.targetinfo': No such file or directory
+Installing all packages from feed packages.
+Installing all packages from feed luci.
+Installing all packages from feed routing.
+Installing all packages from feed telephony.
+Installing all packages from feed video.
++ cp /home/zed/coding/openwrt/Openwrt-Make/config/MakeMenu.x86-official.config .config
++ make defconfig
+Checking 'true'... ok.
+Checking 'false'... ok.
+Checking 'working-make'... ok.
+Checking 'case-sensitive-fs'... ok.
+Checking 'proper-umask'... ok.
+Checking 'gcc'... ok.
+Checking 'working-gcc'... ok.
+Checking 'g++'... ok.
+Checking 'working-g++'... ok.
+Checking 'ncurses.h'... failed.
+Checking 'git'... ok.
+Checking 'rsync'... ok.
+Checking 'perl-data-dumper'... ok.
+Checking 'perl-findbin'... ok.
+Checking 'perl-file-copy'... ok.
+Checking 'perl-file-compare'... ok.
+Checking 'perl-thread-queue'... ok.
+Checking 'perl-ipc-cmd'... ok.
+Checking 'tar'... ok.
+Checking 'find'... ok.
+Checking 'bash'... ok.
+Checking 'xargs'... ok.
+Checking 'patch'... ok.
+Checking 'diff'... ok.
+Checking 'cp'... ok.
+Checking 'seq'... ok.
+Checking 'awk'... failed.
+Checking 'grep'... ok.
+Checking 'egrep'... ok.
+Checking 'getopt'... ok.
+Checking 'realpath'... ok.
+Checking 'stat'... ok.
+Checking 'gzip'... ok.
+Checking 'unzip'... ok.
+Checking 'bzip2'... ok.
+Checking 'wget'... ok.
+Checking 'install'... ok.
+Checking 'perl'... ok.
+Checking 'python'... ok.
+Checking 'python3'... ok.
+Checking 'python3-distutils'... ok.
+Checking 'python3-stdlib'... ok.
+Checking 'file'... ok.
+Checking 'which'... ok.
+Checking 'argp.h'... ok.
+Checking 'fts.h'... ok.
+Checking 'obstack.h'... ok.
+Checking 'libintl.h'... ok.
+Checking 'ldconfig-stub'... ok.
+
+Build dependency: Please install ncurses. (Missing libncurses.so or ncurses.h)
+Build dependency: Please install GNU 'awk'
+
+Prerequisite check failed. Use FORCE=1 to override.
+make: *** [/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/include/toplevel.mk:212：/home/zed/coding/openwrt/Openwrt-Make/tmp/ha/owrt/staging_dir/host/.prereq-build] 错误 1
++ exit 4

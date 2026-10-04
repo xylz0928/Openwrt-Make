@@ -1,0 +1,1 @@
+workflow 治理：①下线流改名 .disabled（不在 Actions 列表展示，文件保留在 HEAD 可恢复）②withClash 取消定时仅留手动/事件③保留5流统一上限30（runs/release/tag 三件套）④补 actions: write 修复既存 Delete-workflow-runs 步骤的 'Resource not accessible by integration'（此前 permissions 仅 contents 导致收窄）；bump PKG_RELEASE 9→10

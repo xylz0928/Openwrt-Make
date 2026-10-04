@@ -1,0 +1,8 @@
+正在变基（1/37）停止在 b39cafb... # OTA x86固件源家族识别+手动切换（全联动）：fw_family 读 DISTRIB_RELEASE 判 official/LEDE（LEDE开头→lede）；型号行右侧加 OfficialOP/LEDE 芯片（仅x86，默认=识别值，点击即重查）；fw 参数(official|lede 与 github|static 词表不相交,空参安全)贯穿 check/download/CLI；LEDE→ 中性'尚未提供，敬请期待'+收起升级入口与下载链接+家族状态行；切回 official→全链恢复；download 携带 fw（lede 机手动选 official 可正常拉取）；后端5例+前端22例联动断言全过
+您现在可以修订这个提交，使用
+
+  git commit --amend 
+
+当您对变更感到满意，执行
+
+  git rebase --continue

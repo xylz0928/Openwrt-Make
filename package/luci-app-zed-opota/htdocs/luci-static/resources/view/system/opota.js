@@ -33,6 +33,10 @@ var CSS = [
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
 	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;}',
+	'#zed-opota .opota-fwsrc{margin-left:6px;white-space:nowrap}',
+	'#zed-opota .opota-fwsrc.hidden{display:none}',
+	'#zed-opota .opota-fwchip{display:inline-block;padding:1px 9px;border-radius:9px;border:1px solid rgba(255,255,255,.4);font-size:10.5px;cursor:pointer;opacity:.72;margin-left:5px;user-select:none}',
+	'#zed-opota .opota-fwchip.on{background:#2563eb;border-color:#93c5fd;opacity:1;font-weight:700;color:#fff}',
 	'#zed-opota .opota-sub{margin-top:6px;font-size:12px;font-weight:500;opacity:.9;',
 	'  font-family:Menlo,Consolas,monospace;word-break:break-all}',
 	'#zed-opota .opota-ring{display:inline-block;width:18px;height:18px;flex-shrink:0}',
@@ -170,6 +174,20 @@ function renderSources() {
 	var el = $('opota-sources');
 	if (!el) return;
 	var d = lastCheck;
+	/* LEDE 家族（尚未提供）：版本行 + 家族行 + 双侧可达性 */
+	if (d && d.fw_available === false) {
+		var lr = [];
+		lr.push('本地版本：' + esc(d.local || '-'));
+		lr.push('固件源：LEDE（尚未提供）');
+		var lb = diagState.browser, lrr = diagState.router;
+		lr.push(lb === '可达 ✓' ? '<span class="src-ok">✓ 浏览器可达</span>'
+			: lb ? '<span class="src-bad">✗ 浏览器' + esc(lb) + '</span>' : '浏览器：检测中…');
+		lr.push(lrr === '可达 ✓' ? '<span class="src-ok">✓ 路由器可达</span>'
+			: lrr === '不可达 ✗' ? '<span class="src-bad">✗ 路由器不可达</span>'
+			: lrr ? '<span class="src-bad">✗ 路由器检测失败</span>' : '路由器：检测中…');
+		el.innerHTML = lr.map(function(x) { return '<div>' + x + '</div>'; }).join('');
+		return;
+	}
 	if (!d || !d.active || !d.sources) {
 		/* 还没有检查结果（如首检即失败）→ 仍渲染已知的双侧可达性行 */
 		var pre = [];
@@ -274,6 +292,7 @@ var GH_TTL = 300000;
 var LB_URL = 'https://raw.githubusercontent.com/' + GH_REPO + '/main/last_build.txt';
 var GH_KEY = { 'x86-efi': 'x86_Official', '360t7-108m': 'MT7981' };
 var cachedProfile = null;
+var selFwFamily = null;   /* x86 固件家族：null=按识别值；手动点击后固定 */
 
 /* 检查编排：缓存 → 层1 raw 直读（零配额）→ 层2 api（回退）。unsupported 空 tag 哨兵 */
 function ghDiscover(profile) {
@@ -353,12 +372,32 @@ function lbDiscover(profile) {
 
 
 /* 型号行：加载即显示（progress 纯本地读取，不等检查更新的网络探测） */
+function syncFwChips() {
+	['official', 'lede'].forEach(function(k) {
+		var c = $('opota-fwchip-' + k);
+		if (c) c.className = 'opota-fwchip' + (k === selFwFamily ? ' on' : '');
+	});
+}
+
 function showModel(d) {
 	if (d && d.profile) cachedProfile = d.profile;
-	var el = $('opota-model');
-	if (!el || !d || !d.model) return;
+	var box = $('opota-model');
+	if (!box || !d || !d.model) return;
 	/* 只显示型号；固件版本由下方"本地版本"行呈现，不重复 */
-	el.textContent = '型号：' + d.model;
+	var txt = $('opota-model-text');
+	if (txt) txt.textContent = '型号：' + d.model;
+	else box.textContent = '型号：' + d.model;
+	/* x86：型号右侧显示固件源识别+手动切换（默认=识别到的家族；硬路由不显示） */
+	var fs = $('opota-fwsrc');
+	if (fs) {
+		if (/^x86_/.test(d.model) && d.family) {
+			fs.className = 'opota-fwsrc';
+			if (!selFwFamily) selFwFamily = d.family;
+			syncFwChips();
+		} else {
+			fs.className = 'opota-fwsrc hidden';
+		}
+	}
 }
 
 /* LuCI 管理路径：L.env.admin_path 在部分构建上是 undefined（实机踩坑：
@@ -465,7 +504,17 @@ return view.extend({
 		]);
 
 		/* 型号行：加载即显示（与 108M 校验同路径落位） */
-		var modelLine = E('div', { 'class': 'opota-model', 'id': 'opota-model' }, ['']);
+		/* 型号行：型号文本 + （仅 x86）固件源家族识别/手动切换 */
+		var modelLine = E('div', { 'class': 'opota-model', 'id': 'opota-model' }, [
+			E('span', { 'id': 'opota-model-text' }, ['']),
+			E('span', { 'class': 'opota-fwsrc hidden', 'id': 'opota-fwsrc' }, [
+				'　固件源：',
+				E('label', { 'class': 'opota-fwchip on', 'id': 'opota-fwchip-official',
+					'click': function() { self.onFwPick('official'); } }, ['OfficialOP']),
+				E('label', { 'class': 'opota-fwchip', 'id': 'opota-fwchip-lede',
+					'click': function() { self.onFwPick('lede'); } }, ['LEDE'])
+			])
+		]);
 
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
 			msg, modelLine, sub, sources,
@@ -584,6 +633,14 @@ return view.extend({
 			+ '\n（已拒绝：不提供检查更新与下载/刷写入口）', 'err');
 	},
 
+	/* 型号行手动切换固件源家族（默认=识别值；切换立即重查） */
+	onFwPick: function(fam) {
+		if (busy) return;
+		selFwFamily = fam;
+		syncFwChips();
+		this.doCheck(selectedSource());
+	},
+
 	/* 路由器侧探测：【浏览器侧落定之后】才发起（展示顺序=浏览器先）；
 	   结果为✗时若检查已通过 → 收起更新入口 + 引导（检查访问权限/切换源） */
 	fireRouterDiag: function(sel) {
@@ -659,7 +716,9 @@ return view.extend({
 					diagState.note = '';
 					renderSources();
 					self.fireRouterDiag('github');
-					return api('check', { source: 'github' }, 30000);
+					var gq = { source: 'github' };
+					if (selFwFamily) gq.fw = selFwFamily;
+					return api('check', gq, 30000);
 				}).catch(function(err) {
 					diagState.browser = shortDiagReason(err);
 					diagState.note = '';
@@ -669,7 +728,9 @@ return view.extend({
 				});
 			});
 		} else {
-			req = api('check', { source: sel }, 30000);
+			var sq = { source: sel };
+			if (selFwFamily) sq.fw = selFwFamily;
+			req = api('check', sq, 30000);
 		}
 		req.then(function(d) {
 			self.setBusy(false);
@@ -751,6 +812,16 @@ return view.extend({
 			}
 
 			/* 所选源不可达：只报错 + 建议切换（不偷偷换源） */
+			/* 家族=LEDE（选中或识别）：尚未提供 → 中性提示、无升级入口 */
+			if (d.fw_available === false) {
+				self.setStatus('', 'LEDE 固件源尚未提供');
+				self.showUpdateRow(false);
+				if (lnk) lnk.style.display = 'none';
+				self.setSub('本地 ' + d.local + '　固件源：LEDE');
+				self.showResult('LEDE 固件源尚未提供，敬请期待。\n切换上方固件源到 OfficialOP 即可正常检查与升级。', 'info');
+				return;
+			}
+
 			if (!d.selected_ok) {
 				self.showUpdateRow(false);
 				if (lnk) lnk.style.display = 'none';
@@ -907,7 +978,9 @@ return view.extend({
 		self.hideResult();
 		self.setStatusRing('downloading', '正在下载固件（' + srcLabel(sel) + '）…', 0);
 		self.setSub('0%');
-		api('download', { size: (lastCheck && lastCheck.size) || 0, source: sel }).then(function(d) {
+		var dq = { size: (lastCheck && lastCheck.size) || 0, source: sel };
+		if (selFwFamily) dq.fw = selFwFamily;
+		api('download', dq).then(function(d) {
 			if (!d || !d.ok) {
 				self.setBusy(false);
 				if (d && d.code === 'space') {
