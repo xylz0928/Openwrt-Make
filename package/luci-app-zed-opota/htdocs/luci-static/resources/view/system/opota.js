@@ -472,8 +472,11 @@ return view.extend({
 			/* 更新操作紧贴版本输出（更靠近检查更新行） */
 			updateRow,
 			srcPick, result,
-			E('div', { 'class': 'opota-btn-row' },
-				[btnSpace, btnSmart, btnUdpxy, btnClearFw, btnLog]),
+			/* 按钮分三行（2026-10-04 用户版式）：
+			   ①空间检查+清固件缓存 ②Smart+udpxy ③查看日志 */
+			E('div', { 'class': 'opota-btn-row' }, [btnSpace, btnClearFw]),
+			E('div', { 'class': 'opota-btn-row' }, [btnSmart, btnUdpxy]),
+			E('div', { 'class': 'opota-btn-row' }, [btnLog]),
 			logWrap
 		]);
 
