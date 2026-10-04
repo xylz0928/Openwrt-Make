@@ -354,7 +354,7 @@ function lbDiscover(profile) {
 				fin(ke, true);
 				return;
 			}
-			fin({ tag: GH_PREFIX[profile] + 'R' + date, size: size, published: pub, ts: Date.now(), via: 'raw' }, false);
+			fin({ tag: GH_PREFIX[profile] + 'R' + date, date: date, size: size, published: pub, ts: Date.now(), via: 'raw' }, false);
 		}).catch(function() {
 			var ne = new Error('版本文件不可达（raw.githubusercontent.com 网络错误）');
 			ne.short = '不可达';
@@ -615,6 +615,7 @@ return view.extend({
 			+ (sel ? srcLabel(sel) : '按型号默认源') + '）…', null);
 		self.setSub('');
 		var req;
+		self._lbInfo = null;
 		if (!sel || sel === 'github') {
 			/* pushbot 模式：默认浏览器发起（零路由器配额）；
 			   失败（限流/超时/网络）→ 回退后端 gh_probe 代查（用户指定的回退路径） */
@@ -627,7 +628,8 @@ return view.extend({
 			req = profP.then(function(prof) {
 				/* 前端直读固定文件（浏览器侧可达 = 读成功）；检查交后端——
 				   后端也直读同一文件，两侧独立可判。无任何 api.github.com */
-				return ghDiscover(prof).then(function() {
+				return ghDiscover(prof).then(function(info) {
+					self._lbInfo = info || null;
 					diagState.browser = '可达 ✓';
 					diagState.note = '';
 					renderSources();
@@ -653,6 +655,21 @@ return view.extend({
 			}
 			lastCheck = d;
 			showModel(d);
+
+			/* 浏览器已读到版本文件、而路由器侧读取失败：用浏览器数据补齐状态行
+			   （线上版本/tag/发布时间/体积照显；下载入口仍按路由器实际能力隐藏） */
+			if (d.active === 'github' && d.sources && d.sources.github
+				&& self._lbInfo && self._lbInfo.tag && !d.sources.github.tag) {
+				var g = d.sources.github;
+				g.tag = self._lbInfo.tag;
+				g.version = self._lbInfo.date ? ('R' + self._lbInfo.date) : '';
+				g.size = g.size || self._lbInfo.size || 0;
+				g.published = self._lbInfo.published || '';
+				g.ok = true;
+				g.checked = true;
+				if (!d.size) d.size = g.size;
+				d.__lbBrowser = true;
+			}
 
 			/* 静态源：浏览器侧探测先落定，再发起路由器侧（展示顺序=浏览器先） */
 			if (d.active === 'static' && !diagState.browser) {
@@ -710,9 +727,16 @@ return view.extend({
 
 			/* 所选源不可达：只报错 + 建议切换（不偷偷换源） */
 			if (!d.selected_ok) {
-				self.setStatus('err', '所选固件源不可达');
 				self.showUpdateRow(false);
 				if (lnk) lnk.style.display = 'none';
+				if (d.__lbBrowser) {
+					/* 浏览器已取到版本（状态行照显），仅路由器侧读文件失败 */
+					self.setStatus('err', '路由器侧读取失败');
+					self.showResult('浏览器已读取到版本文件（上方状态行已显示），但路由器侧读取失败（见检测行 ✗）。\n'
+						+ '本设备无法经路由器下载：请排查路由器侧网络/hosts，或切换 Zed-NAS 源。', 'err');
+					return;
+				}
+				self.setStatus('err', '所选固件源不可达');
 				self.showResult('所选固件源（' + srcLabel(d.active)
 					+ '）不可达，请切换上方"固件源"后重试。', 'err');
 				return;
