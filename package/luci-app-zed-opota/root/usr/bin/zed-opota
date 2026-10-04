@@ -60,6 +60,41 @@ detect_profile() {
 	echo "unsupported"
 }
 
+# 当前设备型号（纯本地读取，供前端加载即显示、不等检查更新）：
+# board.json 的 model.name → DISTRIB_TARGET 兜底
+model_name() {
+	local n
+	if [ -f "$OPOTA_BOARD_JSON" ]; then
+		n=$(jsonfilter -e '@.model.name' < "$OPOTA_BOARD_JSON" 2>/dev/null)
+		if [ -n "$n" ]; then
+			printf '%s' "$n"
+			return 0
+		fi
+	fi
+	n=$(sed -n 's/^DISTRIB_TARGET=//p' "$RELEASE_FILE" 2>/dev/null | head -n1)
+	n=${n#\"}
+	n=${n#\'}
+	n=${n%%\"*}
+	n=${n%%\'*}
+	printf '%s' "${n:-unknown}"
+}
+
+# 108M 固件方案校验（360T7 专用，2026-10-04 用户指令）：
+# ① board id 必须带 108M（qihoo,360t7,108M）
+# ② /proc/mtd 的 ubi 分区必须正好 108MiB = 06c00000（实测两台108M机一致）
+# 任一不符 → 拒绝提供固件，防把108M镜像刷到非108M方案机器上变砖
+MTD_FILE=${OPOTA_MTD_FILE:-/proc/mtd}
+flash_108m_ok() {
+	local id hex
+	if [ -f "$OPOTA_BOARD_JSON" ]; then
+		id=$(jsonfilter -e '@.model.id' < "$OPOTA_BOARD_JSON" 2>/dev/null)
+		case "$id" in *108M*) ;; *) return 1 ;; esac
+	fi
+	hex=$(awk '$4 == "\"ubi\"" { print $2 }' "$MTD_FILE" 2>/dev/null | head -n1)
+	[ "$hex" = "06c00000" ] || return 1
+	return 0
+}
+
 # profile 配置项：tag_prefix / asset / static_img / static_ver / default_src
 profile_conf() {
 	case "$PROFILE" in
@@ -77,8 +112,9 @@ profile_conf() {
 		asset)       echo "immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin" ;;
 		static_img)  echo "https://static.z.7ze.top:20443/files/360-t7-108M.bin" ;;
 		static_ver)  echo "https://static.z.7ze.top:20443/files/build_date_mt798x.txt" ;;
-		# 360T7 的日期化 tag 待 mt7981 工作流首次产出，默认先走 Zed-NAS
-		default_src) echo "static" ;;
+		# 默认源全型号统一 GitHub（与 x86 设计一致，2026-10-04 用户指令）；
+		# mt7981 日期化 tag 首次产出前，GitHub 探测会失败并提示切 Zed-NAS
+		default_src) echo "github" ;;
 		esac ;;
 	*) return 1 ;;
 	esac
@@ -280,11 +316,21 @@ do_check() {
 	# 型号未开放 OTA：仅回显状态，不探测任何源
 	if [ "$PROFILE" = "unsupported" ]; then
 		log_line "检查更新：该型号暂未开放 OTA（本地 ${local_v}）"
-		emit "{\"ok\":true,\"local\":\"$(jesc "$local_v")\",\"profile\":\"unsupported\",\"supported\":false}"
+		emit "{\"ok\":true,\"local\":\"$(jesc "$local_v")\",\"profile\":\"unsupported\"," \
+			"\"supported\":false,\"model\":\"$(jesc "$(model_name)")\"}"
 		exit 0
 	fi
 
-	# source 缺省 → 型号默认源（x86=github，360t7=static）
+	# 108M 方案校验不过：明确拒绝并提示（不探测、不给 URL）
+	if [ "$PROFILE" = "360t7-108m" ] && ! flash_108m_ok; then
+		log_line "检查更新：拒绝（固件方案不匹配，非108M路由器，本地 ${local_v}）"
+		emit "{\"ok\":true,\"local\":\"$(jesc "$local_v")\",\"profile\":\"${PROFILE}\"," \
+			"\"supported\":true,\"flash_compatible\":false," \
+			"\"error\":\"本固件源不兼容非108M版本路由器\"}"
+		exit 0
+	fi
+
+	# source 缺省 → 型号默认源（全型号统一 GitHub）
 	if [ -z "${1:-}" ]; then
 		sel=$DEFAULT_SRC
 	else
@@ -342,6 +388,7 @@ do_check() {
 	fi
 
 	emit "{\"ok\":true,\"local\":\"${local_v}\",\"profile\":\"${PROFILE}\",\"supported\":true," \
+		"\"model\":\"$(jesc "$(model_name)")\"," \
 		"\"active\":\"${sel}\"," \
 		"\"selected_ok\":${selected_ok},\"has_update\":${upd}," \
 		"\"sources\":{" \
@@ -386,6 +433,10 @@ do_download() {
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
 	[ "$PROFILE" != "unsupported" ] || fail "该型号暂未开放在线升级"
+	if [ "$PROFILE" = "360t7-108m" ] && ! flash_108m_ok; then
+		log_line "下载中止：固件方案不匹配（非108M路由器）"
+		fail "本固件源不兼容非108M版本路由器"
+	fi
 	case "${2:-$DEFAULT_SRC}" in
 	static) sel=static ;;
 	*) sel=github ;;
@@ -482,7 +533,7 @@ do_download() {
 }
 
 do_progress() {
-	local stage got total percent asset
+	local stage got total percent asset fc
 	stage=$(stage_get)
 	asset=$(asset_get)
 	got=0
@@ -499,9 +550,14 @@ do_progress() {
 	fi
 	[ "$stage" = "ready" ] && percent=100
 
+	# 108M 方案校验随加载路径一并返回（前端在型号显示处直接拒绝，不等检查更新）
+	fc=true
+	[ "$PROFILE" = "360t7-108m" ] && ! flash_108m_ok && fc=false
 	emit "{\"ok\":true,\"stage\":\"${stage}\",\"got\":${got},\"total\":${total}," \
 		"\"percent\":${percent},\"source\":\"$(cat "$WORK/source" 2>/dev/null)\"," \
-		"\"error\":\"$(jesc "$(err_get)")\"}"
+		"\"error\":\"$(jesc "$(err_get)")\"," \
+		"\"model\":\"$(jesc "$(model_name)")\",\"local\":\"$(jesc "$(local_ver)")\"," \
+		"\"profile\":\"${PROFILE}\",\"flash_compatible\":${fc}}"
 }
 
 do_install() {

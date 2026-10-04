@@ -32,6 +32,7 @@ var CSS = [
 	'#zed-opota .opota-card.is-ready{background:linear-gradient(135deg,#14b8a6,#0d9488)}',
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
+	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;',
 	'#zed-opota .opota-sub{margin-top:6px;font-size:12px;font-weight:500;opacity:.9;',
 	'  font-family:Menlo,Consolas,monospace;word-break:break-all}',
 	'#zed-opota .opota-ring{display:inline-block;width:18px;height:18px;flex-shrink:0}',
@@ -150,6 +151,13 @@ function esc(s) {
 	});
 }
 
+/* 型号行：加载即显示（progress 纯本地读取，不等检查更新的网络探测） */
+function showModel(d) {
+	var el = $('opota-model');
+	if (!el || !d || !d.model) return;
+	el.textContent = '型号：' + d.model + (d.local ? '　固件：' + d.local : '');
+}
+
 /* LuCI 管理路径：L.env.admin_path 在部分构建上是 undefined（实机踩坑：
  * 所有端点被拼成相对 URL "undefinedsystem/..." → 404），改用三层推导：
  * 1) 字符串型 admin_path 2) 当前页面 pathname 的 "/admin/" 截断（最可靠）
@@ -253,8 +261,11 @@ return view.extend({
 			E('pre', { 'class': 'opota-logbody', 'id': 'opota-logbody' }, [''])
 		]);
 
+		/* 型号行：加载即显示（与 108M 校验同路径落位） */
+		var modelLine = E('div', { 'class': 'opota-model', 'id': 'opota-model' }, ['']);
+
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
-			msg, sub, sources,
+			msg, modelLine, sub, sources,
 			/* 更新操作紧贴版本输出（更靠近检查更新行） */
 			updateRow,
 			srcPick, result,
@@ -354,6 +365,18 @@ return view.extend({
 		if (row) row.className = 'opota-btn-row' + (show ? '' : ' hidden');
 	},
 
+	/* 108M 方案不匹配：一进页面（progress 路径）即外显拒绝，无需点检查更新 */
+	showIncompatible: function(d) {
+		showModel(d);
+		this.setStatus('err', '固件方案不匹配');
+		this.showUpdateRow(false);
+		var lnF = $('opota-lnk-download');
+		if (lnF) lnF.style.display = 'none';
+		this.setSub('本地 ' + (d.local || '?'));
+		this.showResult((d.error || '本固件源不兼容非108M版本路由器')
+			+ '\n（已拒绝：不提供检查更新与下载/刷写入口）', 'err');
+	},
+
 	/* 检查更新。source=null → 不带参数，后端按型号默认源（进页自动检查走这条） */
 	onSourceChange: function() {
 		if (busy) return;   /* 检查中点击：连选中视觉都不改，防状态错位 */
@@ -382,6 +405,13 @@ return view.extend({
 				return;
 			}
 			lastCheck = d;
+			showModel(d);
+
+			/* 108M 方案不匹配（后端在加载/检查两路都会给出）→ 直接拒绝 */
+			if (d.flash_compatible === false) {
+				self.showIncompatible(d);
+				return;
+			}
 
 			/* 型号未开放 OTA（如未适配的 mediatek 板）：明确提示，不渲染源状态 */
 			if (d.supported === false) {
@@ -443,7 +473,7 @@ return view.extend({
 				self.showUpdateRow(false);
 				if (lnk) lnk.style.display = 'none';
 				self.showResult('所选固件源（' + srcLabel(d.active)
-					+ '）不可达，请切换上方"固件源"后重试。\n另一源的状态见上方。', 'err');
+					+ '）不可达，请切换上方"固件源"后重试。', 'err');
 				return;
 			}
 
@@ -617,6 +647,12 @@ return view.extend({
 
 	onProgress: function(d) {
 		var self = this;
+		if (d.model) showModel(d);
+		/* 108M 方案校验随加载完成：不匹配 → 直接进入拒绝态，不等检查更新 */
+		if (d.flash_compatible === false) {
+			self.showIncompatible(d);
+			return;
+		}
 		var srcTag = d.source ? '（' + srcLabel(d.source) + '）' : '';
 		switch (d.stage) {
 		case 'downloading':
