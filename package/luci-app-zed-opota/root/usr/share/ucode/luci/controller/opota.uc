@@ -32,6 +32,12 @@ function digits(v) {
 	return replace(v ?? "", /[^0-9]/g, "");
 }
 
+/* 固件家族白名单（official|lede，缺省=后端按 DISTRIB_RELEASE 自识别；x86 型号行手动切换用） */
+function fw_param() {
+	let v = http.formvalue("fw") ?? "";
+	return (v == "official" || v == "lede") ? v : "";
+}
+
 /* 固件源白名单（Zed-Github | Zed-NAS）；缺省返回空串 =
    交由后端按型号默认源决定（x86=GitHub，360T7=Zed-NAS） */
 /* 浏览器 API 顺带带回的资产体积（字节，纯数字白名单） */
@@ -60,12 +66,15 @@ function src_param() {
 
 return {
 	act_check: function() {
+		/* 词表不相交（official|lede vs github|static）→ 空参跳过也不歧义 */
 		let a = "check";
+		let f = fw_param();
+		if (f != "") a += " " + f;
 		let s = src_param();
 		if (s != "") a += " " + s;
 		let t = tag_param();
 		if (t != "") {
-			if (s == "") a += " github";
+			if (s == "" && f == "") a += " github";
 			a += " " + t;
 			let z = size_param();
 			if (z != "") a += " " + z;
@@ -81,8 +90,9 @@ return {
 	act_download: function() {
 		let size = digits(http.formvalue("size"));
 		let t = tag_param();
-		relay("download " + (size != "" ? size : "0") + " " + src_param()
-			+ (t != "" ? " " + t : ""));
+		let f = fw_param();
+		relay("download " + (f != "" ? f + " " : "") + (size != "" ? size : "0")
+			+ " " + src_param() + (t != "" ? " " + t : ""));
 	},
 
 	/* 来源可达性诊断：路由器侧 github.com 主站 / 静态站 连通性（零 API 配额） */

@@ -60,6 +60,23 @@ detect_profile() {
 	echo "unsupported"
 }
 
+# x86 固件家族识别（读 DISTRIB_RELEASE 原串，2026-10-04 用户规则）：
+#   LEDE 开头 → lede（如 SNF 的 "LEDE R2026-08-15 by Zed-7nian"）
+#   其余（如官方线 "R2026-10-03.by.Zed-7nian"）→ official
+# 非 x86 不使用（硬路由按 profile 走）
+fw_family() {
+	local raw
+	raw=$(sed -n 's/^DISTRIB_RELEASE=//p' "$RELEASE_FILE" 2>/dev/null | head -n1)
+	raw=${raw#\"}
+	raw=${raw#\'}
+	raw=${raw%%\"*}
+	raw=${raw%%\'*}
+	case "$raw" in
+	LEDE*) echo "lede" ;;
+	*) echo "official" ;;
+	esac
+}
+
 # 当前设备型号（纯本地读取，供前端加载即显示、不等检查更新）：
 # board.json 的 model.name → DISTRIB_TARGET 兜底
 model_name() {
@@ -139,6 +156,7 @@ profile_conf() {
 }
 
 PROFILE=$(detect_profile)
+FAMILY=$(fw_family)
 if [ "$PROFILE" = "unsupported" ]; then
 	IMG=""; TAG_PREFIX=""
 	STATIC_VER_URL=""; STATIC_IMG_URL=""; STATIC_SHA_URL=""; STATIC_ASSET=""
@@ -376,6 +394,14 @@ verify_core() {
 # do_check [source]：source=前台所选源（github=Zed-Github | static=Zed-NAS，默认 github），白名单
 do_check() {
 	local local_v sel gh_ok st_ok gh_checked st_checked selected_ok upd asset img_url sha_url size
+	local fam src_in tag_in size_in
+	# 首参可选家族（official|lede，与 github/static 不同词表）→ 无歧义；
+	# 兼容旧位置参数（CLI：check [source] [tag] [size]）
+	case "${1:-}" in
+	official|lede) fam=$1; src_in=${2:-}; tag_in=${3:-}; size_in=${4:-} ;;
+	*) fam=""; src_in=${1:-}; tag_in=${2:-}; size_in=${3:-} ;;
+	esac
+	[ -n "$fam" ] || fam=$FAMILY
 	local_v=$(local_ver)
 	[ -n "$local_v" ] || fail "无法读取本地固件版本"
 
@@ -396,11 +422,22 @@ do_check() {
 		exit 0
 	fi
 
+	# LEDE 家族：尚未提供固件源（用户 2026-10-04：选中/识别到 LEDE 时提示期待）
+	if [ "$fam" = "lede" ]; then
+		log_line "检查更新：LEDE 固件源尚未提供（本地 ${local_v}）"
+		emit "{\"ok\":true,\"local\":\"$(jesc "$local_v")\",\"profile\":\"${PROFILE}\"," \
+			"\"supported\":true,\"flash_compatible\":true,\"family\":\"lede\"," \
+			"\"fw_available\":false,\"active\":\"\",\"selected_ok\":false," \
+			"\"has_update\":false,\"model\":\"$(jesc "$(model_name)")\"," \
+			"\"sources\":{},\"img_url\":\"\",\"sha_url\":\"\",\"asset\":\"\",\"size\":0}"
+		exit 0
+	fi
+
 	# source 缺省 → 型号默认源（全型号统一 GitHub）
-	if [ -z "${1:-}" ]; then
+	if [ -z "$src_in" ]; then
 		sel=$DEFAULT_SRC
 	else
-		case "$1" in
+		case "$src_in" in
 		static) sel=static ;;
 		*) sel=github ;;
 		esac
@@ -411,18 +448,18 @@ do_check() {
 	gh_checked=false; st_checked=false
 	if [ "$sel" = github ]; then
 		gh_checked=true
-		if [ -n "${2:-}" ]; then
-			# 前端已查询到 tag（pushbot 模式：检查由浏览器发起）→ 零 API 构造
-			if gh_from_tag "$2"; then gh_ok=true; fi
+		if [ -n "$tag_in" ]; then
+			# 前端/CLI 传入的 tag → 零 API 构造
+			if gh_from_tag "$tag_in"; then gh_ok=true; fi
 		elif lb_probe; then
 			# 后端直接读固定版本文件（零 api）
 			gh_ok=true
 		fi
 		# 浏览器 API 顺带带回的体积优先（路由器侧 HEAD github 常超时/拿不到
 		# content-length 导致 size=0，空间检查会显示"未获取到"）
-		case "${3:-}" in
+		case "$size_in" in
 		''|*[!0-9]*) ;;
-		*) [ "${3:-0}" -gt 0 ] && GH_SIZE=$3 ;;
+		*) [ "${size_in:-0}" -gt 0 ] && GH_SIZE=$size_in ;;
 		esac
 	else
 		st_checked=true
@@ -466,6 +503,7 @@ do_check() {
 	fi
 
 	emit "{\"ok\":true,\"local\":\"${local_v}\",\"profile\":\"${PROFILE}\",\"supported\":true," \
+		"\"family\":\"${fam}\",\"fw_available\":true," \
 		"\"model\":\"$(jesc "$(model_name)")\"," \
 		"\"active\":\"${sel}\"," \
 		"\"selected_ok\":${selected_ok},\"has_update\":${upd}," \
@@ -507,6 +545,14 @@ do_space() {
 # do_download <bytes> [source]：source=前台所选源（默认 github），白名单，不自动切换
 do_download() {
 	local fw cfg free total need size stage sel asset img_url sha_url
+	local fam="${1:-}"
+
+	# 家族可选首位（official|lede，与数字 size 词表不相交）
+	case "$fam" in
+	official|lede) shift ;;
+	*) fam=$FAMILY ;;
+	esac
+	[ "$fam" != "lede" ] || fail "LEDE 固件源尚未提供，敬请期待"
 
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
@@ -637,7 +683,7 @@ do_progress() {
 		"\"percent\":${percent},\"source\":\"$(cat "$WORK/source" 2>/dev/null)\"," \
 		"\"error\":\"$(jesc "$(err_get)")\"," \
 		"\"model\":\"$(jesc "$(model_name)")\",\"local\":\"$(jesc "$(local_ver)")\"," \
-		"\"profile\":\"${PROFILE}\",\"flash_compatible\":${fc}}"
+		"\"profile\":\"${PROFILE}\",\"flash_compatible\":${fc},\"family\":\"${FAMILY}\"}"
 }
 
 do_install() {
@@ -752,10 +798,10 @@ cmd=${1:-}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
-check)		do_check "${1:-}" "${2:-}" "${3:-}" ;;
+check)		do_check "${1:-}" "${2:-}" "${3:-}" "${4:-}" ;;
 diag)		do_diag ;;
 space)		do_space "${1:-0}" ;;
-download)	do_download "${1:-0}" "${2:-}" "${3:-}" ;;
+download)	do_download "${1:-}" "${2:-}" "${3:-}" "${4:-}" ;;
 progress)	do_progress ;;
 install)	do_install ;;
 clean)		do_clean "${1:-}" ;;
