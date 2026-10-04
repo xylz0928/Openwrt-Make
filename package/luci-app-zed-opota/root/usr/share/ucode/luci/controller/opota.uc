@@ -32,10 +32,12 @@ function digits(v) {
 	return replace(v ?? "", /[^0-9]/g, "");
 }
 
-/* 固件源白名单（前台用户选择：Zed-Github | Zed-NAS，默认 github） */
+/* 固件源白名单（Zed-Github | Zed-NAS）；缺省返回空串 =
+   交由后端按型号默认源决定（x86=GitHub，360T7=Zed-NAS） */
 function src_param() {
 	let s = http.formvalue("source") ?? "";
-	return (s == "static") ? "static" : "github";
+	if (s == "static" || s == "github") return s;
+	return "";
 }
 
 return {

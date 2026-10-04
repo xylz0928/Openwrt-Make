@@ -273,7 +273,7 @@ return view.extend({
 
 		/* 进入页面默认自动检查 GitHub 源（所选源未变时即 GitHub；用户抢点则跳过） */
 		setTimeout(function() {
-			if (!lastCheck && !busy && selectedSource() === 'github') self.doCheck();
+			if (!lastCheck && !busy) self.doCheck(null);
 		}, 300);
 		/* 恢复未完成的下载状态（排在自动检查之后，就绪态优先展示） */
 		setTimeout(function() { self.restoreState(); }, 600);
@@ -354,26 +354,27 @@ return view.extend({
 		if (row) row.className = 'opota-btn-row' + (show ? '' : ' hidden');
 	},
 
-	/* 点击固件源 = 检查更新（该行标签即"检查更新"，无独立按钮） */
+	/* 检查更新。source=null → 不带参数，后端按型号默认源（进页自动检查走这条） */
 	onSourceChange: function() {
 		if (busy) return;   /* 检查中点击：连选中视觉都不改，防状态错位 */
 		document.querySelectorAll('#zed-opota .opota-chip').forEach(function(c) {
 			var input = c.querySelector('input');
 			c.className = 'opota-chip' + (input && input.checked ? ' on' : '');
 		});
-		this.doCheck();
+		this.doCheck(selectedSource());
 	},
 
 	/* ── 动作 ── */
-	doCheck: function() {
+	doCheck: function(source) {
 		var self = this;
 		if (busy) return;
-		var sel = selectedSource();
+		var sel = source || null;
 		self.setBusy(true);
 		self.hideResult();
-		self.setStatusRing('checking', '正在检查更新（' + srcLabel(sel) + '）…', null);
+		self.setStatusRing('checking', '正在检查更新（'
+			+ (sel ? srcLabel(sel) : '按型号默认源') + '）…', null);
 		self.setSub('');
-		api('check', { source: sel }, 30000).then(function(d) {
+		(sel ? api('check', { source: sel }, 30000) : api('check', null, 30000)).then(function(d) {
 			self.setBusy(false);
 			if (!d || !d.ok) {
 				self.setStatus('err', '检查失败');
@@ -381,6 +382,29 @@ return view.extend({
 				return;
 			}
 			lastCheck = d;
+
+			/* 型号未开放 OTA（如未适配的 mediatek 板）：明确提示，不渲染源状态 */
+			if (d.supported === false) {
+				self.setStatus('err', '该型号暂未开放在线升级');
+				self.showUpdateRow(false);
+				var ln0 = $('opota-lnk-download');
+				if (ln0) ln0.style.display = 'none';
+				self.setSub('本地 ' + d.local);
+				self.showResult('当前设备型号暂未开放 OTA（已支持：x86 EFI、360T7-108M）。\n请使用官方刷机/SSH 流程刷写固件。', 'err');
+				return;
+			}
+
+			/* chip 与后端实际生效源同步（型号默认源可能不是 GitHub） */
+			var rg = $('opota-src-github'), rn = $('opota-src-nas');
+			if (rg && rn) {
+				rg.checked = (d.active !== 'static');
+				rn.checked = (d.active === 'static');
+				document.querySelectorAll('#zed-opota .opota-chip').forEach(function(c) {
+					var inp = c.querySelector('input');
+					c.className = 'opota-chip' + (inp && inp.checked ? ' on' : '');
+				});
+			}
+
 			var gh = (d.sources && d.sources.github) || { ok: false };
 			var st = (d.sources && d.sources.static) || { ok: false };
 			var remote = d.active === 'static' ? st.version : gh.version;

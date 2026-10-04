@@ -31,18 +31,74 @@ UDPXY_FILE=${OPOTA_UDPXY_FILE:-/tmp/log/udpxy}
 LOG_FILE=${OPOTA_LOG:-/etc/zed-opota/ota.log}
 LOG_MAX=100
 REPO="xylz0928/Openwrt-Make"
-IMG="openwrt-x86-64-generic-squashfs-combined-efi.img.gz"
-API="https://api.github.com/repos/${REPO}/releases/latest"
+API_BASE="https://api.github.com/repos/${REPO}"
 MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
 
-# Zed-NAS（静态站）
-STATIC_VER_URL="https://static.z.7ze.top:20443/files/build_date_openwrt.txt"
-STATIC_IMG_URL="https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz"
-# 统一命名（2026-10-04 与 NAS 脚本对齐）：Zed-NAS 的校验用每产物专属文件
-# <固件名>.sha256sums（NAS write_product_sha 生成、按 static 文件名改写），
-# 不再用混合多产品的共享 sha256sums；将来 360T7 profile 沿用同一派生规则
-STATIC_SHA_URL="${STATIC_IMG_URL}.sha256sums"
-STATIC_ASSET="OpenWrt-x64.img.gz"
+# ---------------- 型号 profile（多型号 OTA） ----------------
+OPOTA_BOARD_JSON=${OPOTA_BOARD_JSON:-/etc/board.json}
+
+# 识别产品线：x86-efi | 360t7-108m | unsupported
+detect_profile() {
+	local tgt board
+	tgt=$(sed -n 's/^DISTRIB_TARGET=//p' "$RELEASE_FILE" 2>/dev/null | head -n1)
+	tgt=${tgt#\"}
+	tgt=${tgt#\'}
+	tgt=${tgt%%\"*}
+	tgt=${tgt%%\'*}
+	case "$tgt" in
+	x86/*)
+		echo "x86-efi"; return 0 ;;
+	mediatek/*)
+		if [ -f "$OPOTA_BOARD_JSON" ]; then
+			board=$(jsonfilter -e '@.model.id' < "$OPOTA_BOARD_JSON" 2>/dev/null)
+			case "$board" in
+			*360t7*|*qihoo*) echo "360t7-108m"; return 0 ;;
+			esac
+		fi
+		;;
+	esac
+	echo "unsupported"
+}
+
+# profile 配置项：tag_prefix / asset / static_img / static_ver / default_src
+profile_conf() {
+	case "$PROFILE" in
+	x86-efi)
+		case "$1" in
+		tag_prefix)  echo "OP_x86_Official_" ;;
+		asset)       echo "openwrt-x86-64-generic-squashfs-combined-efi.img.gz" ;;
+		static_img)  echo "https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz" ;;
+		static_ver)  echo "https://static.z.7ze.top:20443/files/build_date_openwrt.txt" ;;
+		default_src) echo "github" ;;
+		esac ;;
+	360t7-108m)
+		case "$1" in
+		tag_prefix)  echo "OP_MT7981_" ;;
+		asset)       echo "immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin" ;;
+		static_img)  echo "https://static.z.7ze.top:20443/files/360-t7-108M.bin" ;;
+		static_ver)  echo "https://static.z.7ze.top:20443/files/build_date_mt798x.txt" ;;
+		# 360T7 的日期化 tag 待 mt7981 工作流首次产出，默认先走 Zed-NAS
+		default_src) echo "static" ;;
+		esac ;;
+	*) return 1 ;;
+	esac
+}
+
+PROFILE=$(detect_profile)
+if [ "$PROFILE" = "unsupported" ]; then
+	IMG=""; TAG_PREFIX=""
+	STATIC_VER_URL=""; STATIC_IMG_URL=""; STATIC_SHA_URL=""; STATIC_ASSET=""
+	DEFAULT_SRC="github"
+else
+	TAG_PREFIX=$(profile_conf tag_prefix)
+	IMG=$(profile_conf asset)
+	STATIC_VER_URL=$(profile_conf static_ver)
+	STATIC_IMG_URL=$(profile_conf static_img)
+	# 统一命名（与 NAS write_product_sha 对齐）：<固件名>.sha256sums
+	STATIC_SHA_URL="${STATIC_IMG_URL}.sha256sums"
+	STATIC_ASSET=$(basename "$STATIC_IMG_URL")
+	DEFAULT_SRC=$(profile_conf default_src)
+fi
 
 mkdir -p "$WORK"
 
@@ -88,7 +144,7 @@ release_json() {
 	curl -sS --max-time 10 \
 		-H 'Accept: application/vnd.github+json' \
 		-H 'User-Agent: zed-opota' \
-		"$API" 2>/dev/null
+		"${1:-$API_BASE/releases/latest}" 2>/dev/null
 }
 
 # HEAD 获取远端固件字节数（stdout 数字），失败输出 0
@@ -145,13 +201,21 @@ asset_get() {
 }
 
 # ---------- 双源探测 ----------
-# Zed-Github：GitHub Release（成功设置 GH_* 全局，返回 0）
-# 旧格式 tag（无 R 日期）视为不可用
+# Zed-Github：取发布列表中第一条【本产品前缀】且带 R 日期的 tag
+# （同仓库多产品共存：releases/latest 可能是另一产品的 tag，必须按前缀过滤）
 gh_probe() {
-	local json
-	json=$(release_json)
+	local json line
+	json=$(release_json "${API_BASE}/releases?per_page=30")
 	[ -n "$json" ] || return 1
-	GH_TAG=$(printf '%s' "$json" | jsonfilter -e '@.tag_name' 2>/dev/null)
+	# 前缀 + R 日期匹配全在 awk 内完成（POSIX 安全：不用进程替换/数组）
+	GH_TAG=$(printf '%s' "$json" | awk -v pfx="$TAG_PREFIX" '
+		/"tag_name"/ {
+			s = $0
+			sub(/.*"tag_name": "/, "", s)
+			sub(/".*/, "", s)
+			if (index(s, pfx) == 1 && s ~ /R[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/)
+				print s
+		}' | head -n1)
 	[ -n "$GH_TAG" ] || return 1
 	GH_DATE=$(printf '%s' "$GH_TAG" | grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
 	[ -n "$GH_DATE" ] || return 1
@@ -159,7 +223,7 @@ gh_probe() {
 	GH_SHA_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/sha256sums"
 	GH_SIZE=$(remote_size "$GH_IMG_URL")
 	case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
-	GH_PUB=$(printf '%s' "$json" | jsonfilter -e '@.published_at' 2>/dev/null)
+	GH_PUB=$(release_json "${API_BASE}/releases/tags/${GH_TAG}" | jsonfilter -e '@.published_at' 2>/dev/null)
 	GH_PUB=${GH_PUB:-}
 	return 0
 }
@@ -201,10 +265,22 @@ do_check() {
 	local_v=$(local_ver)
 	[ -n "$local_v" ] || fail "无法读取本地固件版本"
 
-	case "${1:-github}" in
-	static) sel=static ;;
-	*) sel=github ;;
-	esac
+	# 型号未开放 OTA：仅回显状态，不探测任何源
+	if [ "$PROFILE" = "unsupported" ]; then
+		log_line "检查更新：该型号暂未开放 OTA（本地 ${local_v}）"
+		emit "{\"ok\":true,\"local\":\"$(jesc "$local_v")\",\"profile\":\"unsupported\",\"supported\":false}"
+		exit 0
+	fi
+
+	# source 缺省 → 型号默认源（x86=github，360t7=static）
+	if [ -z "${1:-}" ]; then
+		sel=$DEFAULT_SRC
+	else
+		case "$1" in
+		static) sel=static ;;
+		*) sel=github ;;
+		esac
+	fi
 
 	# 只探测所选源（点哪个查哪个），另一源标记为未检测
 	gh_ok=false; st_ok=false
@@ -253,7 +329,8 @@ do_check() {
 		log_line "检查更新[$sel]：本地高于线上（本地 $local_v > 线上 $remote，可刷写）"
 	fi
 
-	emit "{\"ok\":true,\"local\":\"${local_v}\",\"active\":\"${sel}\"," \
+	emit "{\"ok\":true,\"local\":\"${local_v}\",\"profile\":\"${PROFILE}\",\"supported\":true," \
+		"\"active\":\"${sel}\"," \
 		"\"selected_ok\":${selected_ok},\"has_update\":${upd}," \
 		"\"sources\":{" \
 		"\"github\":{\"ok\":${gh_ok},\"checked\":${gh_checked},\"version\":\"$(jesc "${GH_DATE:-}")\"," \
@@ -296,7 +373,8 @@ do_download() {
 
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
-	case "${2:-github}" in
+	[ "$PROFILE" != "unsupported" ] || fail "该型号暂未开放在线升级"
+	case "${2:-$DEFAULT_SRC}" in
 	static) sel=static ;;
 	*) sel=github ;;
 	esac
@@ -510,9 +588,9 @@ cmd=${1:-}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
-check)		do_check "${1:-github}" ;;
+check)		do_check "${1:-}" ;;
 space)		do_space "${1:-0}" ;;
-download)	do_download "${1:-0}" "${2:-github}" ;;
+download)	do_download "${1:-0}" "${2:-}" ;;
 progress)	do_progress ;;
 install)	do_install ;;
 clean)		do_clean "${1:-}" ;;
