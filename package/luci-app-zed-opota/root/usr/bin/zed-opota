@@ -35,6 +35,7 @@ MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
 
 # ---------------- 型号 profile（多型号 OTA） ----------------
 OPOTA_BOARD_JSON=${OPOTA_BOARD_JSON:-/etc/board.json}
+OPOTA_EFI_DIR=${OPOTA_EFI_DIR:-/sys/firmware/efi}
 
 # 识别产品线：x86-efi | 360t7-108m | unsupported
 detect_profile() {
@@ -63,6 +64,24 @@ detect_profile() {
 # board.json 的 model.name → DISTRIB_TARGET 兜底
 model_name() {
 	local n
+	# x86 系：按【实际运行架构 + 实际启动方式】构造（2026-10-04 用户规则）：
+	#   uname -m → x64/x86；/sys/firmware/efi 存在 = UEFI 启动才带 -EFI
+	#   → x86_x64-EFI / x86_x64 / x86_x86-EFI / x86_x86
+	case "$(uname -m 2>/dev/null)" in
+	x86_64)
+		n="x86_x64"
+		[ -d "$OPOTA_EFI_DIR" ] && n="${n}-EFI"
+		printf '%s' "$n"
+		return 0
+		;;
+	i386|i486|i586|i686)
+		n="x86_x86"
+		[ -d "$OPOTA_EFI_DIR" ] && n="${n}-EFI"
+		printf '%s' "$n"
+		return 0
+		;;
+	esac
+	# 非 x86（硬路由）→ OpenWrt 宣告型号（board.json model.name → DISTRIB_TARGET 兜底）
 	if [ -f "$OPOTA_BOARD_JSON" ]; then
 		n=$(jsonfilter -e '@.model.name' < "$OPOTA_BOARD_JSON" 2>/dev/null)
 		if [ -n "$n" ]; then
