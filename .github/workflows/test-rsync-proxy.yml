@@ -71,8 +71,8 @@ jobs:
         git add last_build.txt
         if git diff --cached --quiet; then echo "last_build.txt 已是最新"; exit 0; fi
         git commit -m "chore(ota): update last_build Test=$DATE"
-        git pull --rebase origin "${{GITHUB_REF_NAME}}"
-        git push origin "HEAD:${{GITHUB_REF_NAME}}"
+        git pull --rebase origin "$GITHUB_REF_NAME"
+        git push origin "HEAD:$GITHUB_REF_NAME"
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
