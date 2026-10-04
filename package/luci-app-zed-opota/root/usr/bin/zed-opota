@@ -65,10 +65,15 @@ detect_profile() {
 #   其余（如官方线 "R2026-10-03.by.Zed-7nian"）→ official
 # 非 x86 不使用（硬路由按 profile 走）
 fw_family() {
-	# 2026-10-05 实机校准（SNF）：LEDE 标记可能在
-	#   openwrt_release 的 DISTRIB_DESCRIPTION='LEDE ' / DISTRIB_RELEASE
-	#   os-release  的 OPENWRT_RELEASE="LEDE …" / PRETTY_NAME / VERSION
-	# 任一命中即 lede（LEDE 开头或含 LEDE 均算），否则 official
+	# 2026-10-05 三机实测字段对照（判别依据存档）：
+	#   官方x86   DISTRIB_DESCRIPTION='OpenWrt R2026-10-03…'      → official
+	#   ImmortalWrt(T7) DISTRIB_DESCRIPTION='OP-ImmortalWRT …'    → 非LEDE桶（标签占位：
+	#     T7 实为 ImmortalWrt 族，但硬路由不参与家族判断、芯片不显示，永不露出）
+	#   LEDE族(SNF) DISTRIB_DESCRIPTION='LEDE ' + os-release
+	#     OPENWRT_RELEASE='LEDE R26.05.20' / PRETTY_NAME='Openwrt-LEDE …' → lede
+	#   ❌ 弃用 ID/ID_LIKE：三机全同（ID_LIKE="lede openwrt" 是血统声明，非发行版身份）
+	#   ❌ DISTRIB_RELEASE 单独不可靠：SNF 恰为裸值 '24.10.5'
+	# 判别顺序：DISTRIB_DESCRIPTION 首判 → os-release 三字段次判 → 老形态(RELEASE开头) → official
 	local v
 	v=$(grep -E '^DISTRIB_(DESCRIPTION|RELEASE)=' "$RELEASE_FILE" 2>/dev/null)
 	case "$v" in
