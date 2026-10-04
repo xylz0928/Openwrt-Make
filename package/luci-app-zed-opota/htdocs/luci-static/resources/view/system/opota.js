@@ -173,6 +173,8 @@ function renderSources() {
 	var remote = '';
 	if (d.active === 'static') { if (st.ok) remote = st.version || ''; }
 	else { if (gh.ok) remote = gh.version || ''; }
+	/* 显示层统一补 R 前缀（静态源回裸日期，与本地行对不齐——观感问题） */
+	if (remote && /^[0-9]/.test(remote)) remote = 'R' + remote;
 	rows.push('线上版本：' + (remote ? esc(remote) : '—'));
 
 	rows.push('所选源：' + srcLabel(d.active));
