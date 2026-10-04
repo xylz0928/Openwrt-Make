@@ -55,5 +55,12 @@
 			"module": "luci.controller.opota",
 			"function": "act_log"
 		}
+	},
+	"admin/system/opota/diag": {
+		"action": {
+			"type": "function",
+			"module": "luci.controller.opota",
+			"function": "act_diag"
+		}
 	}
 }
