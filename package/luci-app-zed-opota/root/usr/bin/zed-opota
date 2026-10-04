@@ -65,16 +65,20 @@ detect_profile() {
 #   其余（如官方线 "R2026-10-03.by.Zed-7nian"）→ official
 # 非 x86 不使用（硬路由按 profile 走）
 fw_family() {
-	local raw
-	raw=$(sed -n 's/^DISTRIB_RELEASE=//p' "$RELEASE_FILE" 2>/dev/null | head -n1)
-	raw=${raw#\"}
-	raw=${raw#\'}
-	raw=${raw%%\"*}
-	raw=${raw%%\'*}
-	case "$raw" in
-	LEDE*) echo "lede" ;;
-	*) echo "official" ;;
+	# 2026-10-05 实机校准（SNF）：LEDE 标记可能在
+	#   openwrt_release 的 DISTRIB_DESCRIPTION='LEDE ' / DISTRIB_RELEASE
+	#   os-release  的 OPENWRT_RELEASE="LEDE …" / PRETTY_NAME / VERSION
+	# 任一命中即 lede（LEDE 开头或含 LEDE 均算），否则 official
+	local v
+	v=$(grep -E '^DISTRIB_(DESCRIPTION|RELEASE)=' "$RELEASE_FILE" 2>/dev/null)
+	case "$v" in
+	*LEDE*) echo "lede"; return 0 ;;
 	esac
+	v=$(grep -E '^(OPENWRT_RELEASE|PRETTY_NAME|VERSION)=' "$(dirname "$RELEASE_FILE")/os-release" 2>/dev/null)
+	case "$v" in
+	*LEDE*) echo "lede"; return 0 ;;
+	esac
+	echo "official"
 }
 
 # 当前设备型号（纯本地读取，供前端加载即显示、不等检查更新）：
