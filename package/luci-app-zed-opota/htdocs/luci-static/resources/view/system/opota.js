@@ -182,7 +182,8 @@ function renderSources() {
 	if (br === '可达 ✓') bTxt = '<span class="src-ok">✓ 浏览器可达</span>';
 	else if (br) bTxt = '<span class="src-bad">✗ 浏览器' + esc(br) + '</span>';
 	else bTxt = '浏览器：检测中…';
-	rows.push(esc(srcLabel(d.active)) + '：' + bTxt);
+	/* 源名已在"所选源"行，这里不再重复 */
+	rows.push(bTxt);
 
 	if (rr === '可达 ✓') rTxt = '<span class="src-ok">✓ 路由器可达</span>';
 	else if (rr === '不可达 ✗') rTxt = '<span class="src-bad">✗ 路由器不可达</span>';
