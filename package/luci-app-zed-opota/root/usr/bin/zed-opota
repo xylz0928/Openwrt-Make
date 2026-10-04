@@ -716,10 +716,13 @@ do_log() {
 # 只做 HEAD 连通性：github.com 主站（不耗 API 配额）+ 静态站固件头
 do_diag() {
 	local gh=false st=false
-	if curl -sI --max-time 5 -o /dev/null "$LB_URL" 2>/dev/null; then
+	# github 侧 = 真实"可下载"判定：读版本文件(带重试) + 资产直链 HEAD(带重试，
+	# 会跟随跳转到 CDN —— CDN DNS 不通时这里就会判✗，与实际能否拉取一致)
+	if lb_probe && curl_retry -sIL --max-time 10 -o /dev/null "$GH_IMG_URL" 2>/dev/null; then
 		gh=true
 	fi
-	if [ -n "$STATIC_IMG_URL" ] && curl -sI --max-time 5 -o /dev/null "$STATIC_IMG_URL" 2>/dev/null; then
+	# 静态站侧同样带重试（与检查路径同标准，消灭单次 HEAD 的假阴性）
+	if [ -n "$STATIC_IMG_URL" ] && curl_retry -sI --max-time 5 -o /dev/null "$STATIC_IMG_URL" 2>/dev/null; then
 		st=true
 	fi
 	emit "{\"ok\":true,\"github\":${gh},\"static\":${st}}"

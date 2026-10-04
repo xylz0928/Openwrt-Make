@@ -158,22 +158,10 @@ function esc(s) {
 var diagState = { browser: null, router: null, note: '' };
 var diagSeq = 0;   /* 切源/重置后丢弃迟到的 diag 响应 */
 
-/* 路由器侧探测：【浏览器侧落定之后】才发起（2026-10-04 用户反馈：
-   检查优先浏览器，展示顺序也必须浏览器先于路由器） */
-function fireRouterDiag(sel) {
-	var mySeq = ++diagSeq;
-	api('diag', null, 15000).then(function(g) {
-		if (mySeq !== diagSeq) return;
-		if (!g || !g.ok) { diagState.router = '检测失败'; renderSources(); return; }
-		diagState.router = (sel === 'static')
-			? (g.static ? '可达 ✓' : '不可达 ✗')
-			: (g.github ? '可达 ✓' : '不可达 ✗');
-		renderSources();
-	}).catch(function() {
-		if (mySeq !== diagSeq) return;
-		diagState.router = '检测失败';
-		renderSources();
-	});
+/* 路由器侧不可达且检查已通过 → 收起更新入口并给引导（用户2026-10-04场景） */
+function routerHintNeeded() {
+	return !!(lastCheck && lastCheck.selected_ok && diagState.router
+		&& diagState.router !== '可达 ✓');
 }
 
 /* 状态区渲染（2026-10-04 用户版式）：本地/线上/所选源 + 双侧可达性 + tag/时间/体积
@@ -593,6 +581,40 @@ return view.extend({
 			+ '\n（已拒绝：不提供检查更新与下载/刷写入口）', 'err');
 	},
 
+	/* 路由器侧探测：【浏览器侧落定之后】才发起（展示顺序=浏览器先）；
+	   结果为✗时若检查已通过 → 收起更新入口 + 引导（检查访问权限/切换源） */
+	fireRouterDiag: function(sel) {
+		var self = this;
+		var mySeq = ++diagSeq;
+		api('diag', null, 15000).then(function(g) {
+			if (mySeq !== diagSeq) return;
+			if (!g || !g.ok) diagState.router = '检测失败';
+			else diagState.router = (sel === 'static')
+				? (g.static ? '可达 ✓' : '不可达 ✗')
+				: (g.github ? '可达 ✓' : '不可达 ✗');
+			renderSources();
+			if (routerHintNeeded()) {
+				var ub = $('opota-update-btns');
+				if (ub) ub.className = 'opota-btn-row hidden';
+				var lnk = $('opota-lnk-download');
+				if (lnk) lnk.style.display = 'none';
+				self.showResult('路由器侧' + (diagState.router === '检测失败' ? '检测失败' : '不可达')
+					+ '，暂无法经本机下载。\n请检查路由器的访问权限（网络/hosts/DNS），或切换 Zed-NAS 源。', 'err');
+			}
+		}).catch(function() {
+			if (mySeq !== diagSeq) return;
+			diagState.router = '检测失败';
+			renderSources();
+			if (routerHintNeeded()) {
+				var ub2 = $('opota-update-btns');
+				if (ub2) ub2.className = 'opota-btn-row hidden';
+				var lnk2 = $('opota-lnk-download');
+				if (lnk2) lnk2.style.display = 'none';
+				self.showResult('路由器侧检测失败，暂无法经本机下载。\n请检查路由器的访问权限（网络/hosts/DNS），或切换 Zed-NAS 源。', 'err');
+			}
+		});
+	},
+
 	/* 检查更新。source=null → 不带参数，后端按型号默认源（进页自动检查走这条） */
 	onSourceChange: function() {
 		if (busy) return;   /* 检查中点击：连选中视觉都不改，防状态错位 */
@@ -633,13 +655,13 @@ return view.extend({
 					diagState.browser = '可达 ✓';
 					diagState.note = '';
 					renderSources();
-					fireRouterDiag('github');
+					self.fireRouterDiag('github');
 					return api('check', { source: 'github' }, 30000);
 				}).catch(function(err) {
 					diagState.browser = shortDiagReason(err);
 					diagState.note = '';
 					renderSources();
-					fireRouterDiag('github');
+					self.fireRouterDiag('github');
 					throw err;
 				});
 			});
@@ -679,7 +701,7 @@ return view.extend({
 				bp.then(function(ok) {
 					diagState.browser = ok ? '可达 ✓' : '不可达 ✗';
 					renderSources();
-					fireRouterDiag('static');
+					self.fireRouterDiag('static');
 				});
 			}
 
@@ -753,6 +775,17 @@ return view.extend({
 			var ub = $('opota-btn-update');
 			if (ub) { ub.style.display = ''; ub.disabled = false; }
 			if (lnk) lnk.style.display = '';
+
+			/* 时序兜底：路由器侧诊断可能先于/后于检查返回；
+			   检查通过但路由器✗ → 一律收起更新入口并引导（无法经本机下载） */
+			if (routerHintNeeded()) {
+				var ubH = $('opota-update-btns');
+				if (ubH) ubH.className = 'opota-btn-row hidden';
+				var lnkH = $('opota-lnk-download');
+				if (lnkH) lnkH.style.display = 'none';
+				self.showResult('路由器侧不可达，暂无法经本机下载。\n请检查路由器的访问权限（网络/hosts/DNS），或切换 Zed-NAS 源。', 'err');
+				return;
+			}
 
 			if (rel === 'newer') {
 				self.setStatus('update', '线上有更新版本 ' + rem);
