@@ -156,6 +156,25 @@ function esc(s) {
  * 路由器侧：后端 diag 端点 HEAD 实测（github.com 主站/静态站，零 API 配额）
  * 出问题时用户看这一行即可分辨是"我浏览器的网络"还是"路由器的网络" */
 var diagState = { browser: null, router: null, note: '' };
+var diagSeq = 0;   /* 切源/重置后丢弃迟到的 diag 响应 */
+
+/* 路由器侧探测：【浏览器侧落定之后】才发起（2026-10-04 用户反馈：
+   检查优先浏览器，展示顺序也必须浏览器先于路由器） */
+function fireRouterDiag(sel) {
+	var mySeq = ++diagSeq;
+	api('diag', null, 15000).then(function(g) {
+		if (mySeq !== diagSeq) return;
+		if (!g || !g.ok) { diagState.router = '检测失败'; renderSources(); return; }
+		diagState.router = (sel === 'static')
+			? (g.static ? '可达 ✓' : '不可达 ✗')
+			: (g.github ? '可达 ✓' : '不可达 ✗');
+		renderSources();
+	}).catch(function() {
+		if (mySeq !== diagSeq) return;
+		diagState.router = '检测失败';
+		renderSources();
+	});
+}
 
 /* 状态区渲染（2026-10-04 用户版式）：本地/线上/所选源 + 双侧可达性 + tag/时间/体积
    全部并入原有状态区，每项一行，不再单独占位 */
@@ -208,6 +227,7 @@ function renderSources() {
 }
 
 function diagReset() {
+	diagSeq++;
 	diagState = { browser: null, router: null, note: '' };
 	renderSources();
 }
@@ -571,18 +591,6 @@ return view.extend({
 		self.setStatusRing('checking', '正在检查更新（'
 			+ (sel ? srcLabel(sel) : '按型号默认源') + '）…', null);
 		self.setSub('');
-		/* 路由器侧诊断与检查并行发起（独立端点，结果进"来源检测"行） */
-		api('diag', null, 15000).then(function(g) {
-			if (!g || !g.ok) return;
-			diagState.router = (sel === 'static')
-				? (g.static ? '可达 ✓' : '不可达 ✗')
-				: (g.github ? '可达 ✓' : '不可达 ✗');
-			renderSources();
-		}).catch(function() {
-			diagState.router = '检测失败';
-			renderSources();
-		});
-
 		var req;
 		if (!sel || sel === 'github') {
 			/* pushbot 模式：默认浏览器发起（零路由器配额）；
@@ -598,6 +606,7 @@ return view.extend({
 					diagState.browser = '可达 ✓';
 					diagState.note = '';
 					renderSources();
+					fireRouterDiag('github');
 					self._ghInfo = info;
 					lastGhTag = info.tag || '';
 					var cq = { source: 'github' };
@@ -610,6 +619,7 @@ return view.extend({
 					diagState.browser = shortDiagReason(err);
 					diagState.note = '';
 					renderSources();
+					fireRouterDiag('github');
 					return api('check', { source: 'github' }, 30000).then(function(fd) {
 						/* 只有代查【真拿到结果】才标注；后端也探测失败时不写 */
 						if (fd && fd.ok && fd.selected_ok) {
@@ -648,11 +658,15 @@ return view.extend({
 					d.sources.github.size = self._ghInfo.size;
 			}
 
-			/* 静态源：补一次浏览器侧连通性探测（no-cors） */
-			if (d.active === 'static' && d.img_url && d.selected_ok && !diagState.browser) {
-				browserReach(d.img_url).then(function(ok) {
+			/* 静态源：浏览器侧探测先落定，再发起路由器侧（展示顺序=浏览器先） */
+			if (d.active === 'static' && !diagState.browser) {
+				var bp = (d.img_url && d.selected_ok)
+					? browserReach(d.img_url)
+					: Promise.resolve(false);
+				bp.then(function(ok) {
 					diagState.browser = ok ? '可达 ✓' : '不可达 ✗';
 					renderSources();
+					fireRouterDiag('static');
 				});
 			}
 
