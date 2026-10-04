@@ -151,8 +151,75 @@ function esc(s) {
 	});
 }
 
+/* ============ GitHub 浏览器侧查询（pushbot 模式，2026-10-04）============
+ * 检查从前端发起：浏览器直连 api.github.com（CORS ✓），5 分钟 sessionStorage
+ * 缓存降配额；查到的 tag 交给路由器后端构造下载地址。
+ * 后端从此零 api.github.com 调用（github.com 直链无配额）→ 路由器出口 IP
+ * 不再消耗 60 次/小时的 API 额度——根治"能访问 GitHub 却检查不到更新"。 */
+var GH_REPO = 'xylz0928/Openwrt-Make';
+var GH_API = 'https://api.github.com/repos/' + GH_REPO + '/releases?per_page=30';
+var GH_PREFIX = { 'x86-efi': 'OP_x86_Official_', '360t7-108m': 'OP_MT7981_' };
+var GH_TTL = 300000;
+var cachedProfile = null;
+var lastGhTag = '';
+
+function ghDiscover(profile) {
+	var pfx = GH_PREFIX[profile];
+	/* 无发布线（如 unsupported）→ 空 tag 交后端，由后端的型号门禁统一答复 */
+	if (!pfx) return Promise.resolve({ tag: '', published: '', ts: 0 });
+	var key = 'zed-opota-gh-' + profile;
+	try {
+		var c = JSON.parse(sessionStorage.getItem(key) || 'null');
+		if (c && c.tag && (Date.now() - c.ts) < GH_TTL) return Promise.resolve(c);
+	} catch (e) {}
+	return new Promise(function(resolve, reject) {
+		var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+		var done = false;
+		var timer = setTimeout(function() {
+			if (done) return;
+			done = true;
+			if (ctl) { try { ctl.abort(); } catch (e) {} }
+			reject(new Error('GitHub 查询超时（>8s）'));
+		}, 8000);
+		function fin(v, isErr) {
+			if (done) return;
+			done = true;
+			clearTimeout(timer);
+			isErr ? reject(v) : resolve(v);
+		}
+		fetch(GH_API, ctl ? { signal: ctl.signal } : {}).then(function(r) {
+			if (r.status === 403 || r.status === 429) {
+				fin(new Error('GitHub API 限流（按浏览器出口 IP 60次/小时），可稍后再试或切换 Zed-NAS 源'), true);
+				return null;
+			}
+			if (!r.ok) { fin(new Error('GitHub HTTP ' + r.status), true); return null; }
+			return r.json();
+		}).then(function(list) {
+			if (!list || !Array.isArray(list)) return;
+			var pat = new RegExp('^' + pfx.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 'R\\d{4}-\\d{2}-\\d{2}$');
+			var hit = null;
+			for (var i = 0; i < list.length; i++) {
+				var t = list[i] && list[i].tag_name;
+				if (t && pat.test(t)) {
+					hit = { tag: t, published: list[i].published_at || '', ts: Date.now() };
+					break;
+				}
+			}
+			if (!hit) {
+				fin(new Error('未找到规范格式的发布（' + pfx + 'R日期）。若今天已出固件，需确认发布工作流用的是新 tag 规范'), true);
+				return;
+			}
+			try { sessionStorage.setItem(key, JSON.stringify(hit)); } catch (e) {}
+			fin(hit, false);
+		}).catch(function(e) {
+			fin(new Error('无法访问 GitHub（' + ((e && e.message) || '网络错误') + '）'), true);
+		});
+	});
+}
+
 /* 型号行：加载即显示（progress 纯本地读取，不等检查更新的网络探测） */
 function showModel(d) {
+	if (d && d.profile) cachedProfile = d.profile;
 	var el = $('opota-model');
 	if (!el || !d || !d.model) return;
 	/* 只显示型号；固件版本由下方"本地版本"行呈现，不重复 */
@@ -286,9 +353,9 @@ return view.extend({
 		/* 进入页面默认自动检查 GitHub 源（所选源未变时即 GitHub；用户抢点则跳过） */
 		setTimeout(function() {
 			if (!lastCheck && !busy) self.doCheck(null);
-		}, 300);
+		}, 500);
 		/* 恢复未完成的下载状态（排在自动检查之后，就绪态优先展示） */
-		setTimeout(function() { self.restoreState(); }, 600);
+		setTimeout(function() { self.restoreState(); }, 250);
 
 		return node;
 	},
@@ -398,7 +465,31 @@ return view.extend({
 		self.setStatusRing('checking', '正在检查更新（'
 			+ (sel ? srcLabel(sel) : '按型号默认源') + '）…', null);
 		self.setSub('');
-		(sel ? api('check', { source: sel }, 30000) : api('check', null, 30000)).then(function(d) {
+		var req;
+		if (!sel || sel === 'github') {
+			/* pushbot 模式：GitHub 检查由浏览器发起，tag 交给后端（零 API） */
+			var profP = (cachedProfile
+				? Promise.resolve(cachedProfile)
+				: api('progress', null, 10000).then(function(p) {
+					showModel(p || {});
+					return cachedProfile || 'x86-efi';
+				}));
+			req = profP.then(function(prof) {
+				return ghDiscover(prof);
+			}).then(function(info) {
+				self._ghInfo = info;
+				lastGhTag = info.tag || '';
+				return api('check', info.tag
+					? { source: 'github', tag: info.tag }
+					: { source: 'github' }, 30000);
+			});
+		} else {
+			req = api('check', { source: sel }, 30000);
+		}
+		req.then(function(d) {
+			/* published 由浏览器侧带回（后端零 API 拿不到） */
+			if (d && d.sources && d.sources.github && self._ghInfo && self._ghInfo.tag)
+				d.sources.github.published = self._ghInfo.published || '';
 			self.setBusy(false);
 			if (!d || !d.ok) {
 				self.setStatus('err', '检查失败');
@@ -603,11 +694,18 @@ return view.extend({
 		if (busy) return;
 		autoFlash = !!chain;
 		var sel = selectedSource();
+		if (sel === 'github' && !lastGhTag) {
+			/* 防后端退回 API 兜底：必须先完成检查拿到 tag */
+			self.showResult('请先完成检查更新（尚未取得 GitHub 版本标识）', 'err');
+			return;
+		}
 		self.setBusy(true);
 		self.hideResult();
 		self.setStatusRing('downloading', '正在下载固件（' + srcLabel(sel) + '）…', 0);
 		self.setSub('0%');
-		api('download', { size: (lastCheck && lastCheck.size) || 0, source: sel }).then(function(d) {
+		var dq = { size: (lastCheck && lastCheck.size) || 0, source: sel };
+		if (sel === 'github') dq.tag = lastGhTag;
+		api('download', dq).then(function(d) {
 			if (!d || !d.ok) {
 				self.setBusy(false);
 				if (d && d.code === 'space') {

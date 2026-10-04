@@ -34,6 +34,14 @@ function digits(v) {
 
 /* 固件源白名单（Zed-Github | Zed-NAS）；缺省返回空串 =
    交由后端按型号默认源决定（x86=GitHub，360T7=Zed-NAS） */
+/* 前端浏览器查询 GitHub 后带回的 release tag（严格字符白名单，格式由后端二次校验）
+   —— pushbot 模式：检查由浏览器发起，路由器不再自己调 api.github.com（零配额） */
+function tag_param() {
+	let t = http.formvalue("tag") ?? "";
+	if (t.length == 0 || t.length > 64) return "";
+	return (t.match(/^[A-Za-z0-9._-]+$/) ? t : "");
+}
+
 function src_param() {
 	let s = http.formvalue("source") ?? "";
 	if (s == "static" || s == "github") return s;
@@ -42,7 +50,15 @@ function src_param() {
 
 return {
 	act_check: function() {
-		relay("check " + src_param());
+		let a = "check";
+		let s = src_param();
+		if (s != "") a += " " + s;
+		let t = tag_param();
+		if (t != "") {
+			if (s == "") a += " github";
+			a += " " + t;
+		}
+		relay(a);
 	},
 
 	act_space: function() {
@@ -52,7 +68,9 @@ return {
 
 	act_download: function() {
 		let size = digits(http.formvalue("size"));
-		relay("download " + (size != "" ? size : "0") + " " + src_param());
+		let t = tag_param();
+		relay("download " + (size != "" ? size : "0") + " " + src_param()
+			+ (t != "" ? " " + t : ""));
 	},
 
 	act_progress: function() {
