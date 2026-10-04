@@ -33,8 +33,6 @@ var CSS = [
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
 	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;}',
-	'#zed-opota .opota-diag{display:none;margin-top:5px;font-size:11px;line-height:1.7;opacity:.86;word-break:break-all;white-space:pre-line}',
-	'#zed-opota .opota-diag.show{display:block}',
 	'#zed-opota .opota-sub{margin-top:6px;font-size:12px;font-weight:500;opacity:.9;',
 	'  font-family:Menlo,Consolas,monospace;word-break:break-all}',
 	'#zed-opota .opota-ring{display:inline-block;width:18px;height:18px;flex-shrink:0}',
@@ -159,21 +157,56 @@ function esc(s) {
  * 出问题时用户看这一行即可分辨是"我浏览器的网络"还是"路由器的网络" */
 var diagState = { browser: null, router: null, note: '' };
 
-function renderDiag() {
-	var el = $('opota-diag');
+/* 状态区渲染（2026-10-04 用户版式）：本地/线上/所选源 + 双侧可达性 + tag/时间/体积
+   全部并入原有状态区，每项一行，不再单独占位 */
+function renderSources() {
+	var el = $('opota-sources');
 	if (!el) return;
-	var parts = [];
-	if (diagState.browser) parts.push('浏览器侧：' + diagState.browser);
-	if (diagState.router)
-		parts.push('路由器侧：' + diagState.router + (diagState.note ? '　' + diagState.note : ''));
-	if (!parts.length) { el.textContent = ''; el.className = 'opota-diag'; return; }
-	el.className = 'opota-diag show';
-	el.textContent = parts.join('\n');
+	var d = lastCheck;
+	if (!d || !d.active || !d.sources) { el.innerHTML = ''; return; }
+	var gh = d.sources.github || { ok: false };
+	var st = d.sources.static || { ok: false };
+	var rows = [];
+
+	rows.push('本地版本：' + esc(d.local || '-'));
+
+	var remote = '';
+	if (d.active === 'static') { if (st.ok) remote = st.version || ''; }
+	else { if (gh.ok) remote = gh.version || ''; }
+	rows.push('线上版本：' + (remote ? esc(remote) : '—'));
+
+	rows.push('所选源：' + srcLabel(d.active));
+
+	/* 双侧可达性（诊断结果并入此区） */
+	var br = diagState.browser, rr = diagState.router, bTxt, rTxt;
+	if (br === '可达 ✓') bTxt = '<span class="src-ok">✓ 浏览器可达</span>';
+	else if (br) bTxt = '<span class="src-bad">✗ 浏览器' + esc(br) + '</span>';
+	else bTxt = '浏览器：检测中…';
+	rows.push(esc(srcLabel(d.active)) + '：' + bTxt);
+
+	if (rr === '可达 ✓') rTxt = '<span class="src-ok">✓ 路由器可达</span>';
+	else if (rr === '不可达 ✗') rTxt = '<span class="src-bad">✗ 路由器不可达</span>';
+	else if (rr) rTxt = '<span class="src-bad">✗ 路由器检测失败</span>';
+	else rTxt = '路由器：检测中…';
+	rows.push(rTxt + (diagState.note
+		? '<span style="opacity:.78">　' + esc(diagState.note) + '</span>' : ''));
+
+	if (d.active === 'github') {
+		var tl = (gh.ok && gh.tag)
+			? gh.tag + (gh.published ? '　' + gh.published : '')
+			: '';
+		if (tl) rows.push(esc(tl));
+	}
+
+	var sz = d.size || (d.active === 'static' ? st.size : gh.size) || 0;
+	if (sz > 0) rows.push(fmtBytes(sz));
+
+	el.innerHTML = rows.map(function(x) { return '<div>' + x + '</div>'; }).join('');
 }
 
 function diagReset() {
 	diagState = { browser: null, router: null, note: '' };
-	renderDiag();
+	renderSources();
 }
 
 function shortDiagReason(err) {
@@ -399,10 +432,9 @@ return view.extend({
 
 		/* 型号行：加载即显示（与 108M 校验同路径落位） */
 		var modelLine = E('div', { 'class': 'opota-model', 'id': 'opota-model' }, ['']);
-		var diagLine = E('div', { 'class': 'opota-diag', 'id': 'opota-diag' }, ['']);
 
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
-			msg, modelLine, sub, sources, diagLine,
+			msg, modelLine, sub, sources,
 			/* 更新操作紧贴版本输出（更靠近检查更新行） */
 			updateRow,
 			srcPick, result,
@@ -542,10 +574,10 @@ return view.extend({
 			diagState.router = (sel === 'static')
 				? (g.static ? '可达 ✓' : '不可达 ✗')
 				: (g.github ? '可达 ✓' : '不可达 ✗');
-			renderDiag();
+			renderSources();
 		}).catch(function() {
 			diagState.router = '检测失败';
-			renderDiag();
+			renderSources();
 		});
 
 		var req;
@@ -562,7 +594,7 @@ return view.extend({
 				return ghDiscover(prof).then(function(info) {
 					diagState.browser = '可达 ✓';
 					diagState.note = '';
-					renderDiag();
+					renderSources();
 					self._ghInfo = info;
 					lastGhTag = info.tag || '';
 					var cq = { source: 'github' };
@@ -574,12 +606,12 @@ return view.extend({
 					   两个都失败时不写"由路由器代查"（用户2026-10-04反馈） */
 					diagState.browser = shortDiagReason(err);
 					diagState.note = '';
-					renderDiag();
+					renderSources();
 					return api('check', { source: 'github' }, 30000).then(function(fd) {
 						/* 只有代查【真拿到结果】才标注；后端也探测失败时不写 */
 						if (fd && fd.ok && fd.selected_ok) {
 							diagState.note = '（浏览器侧失败，本次由路由器代查）';
-							renderDiag();
+							renderSources();
 						}
 						return fd;
 					});
@@ -617,7 +649,7 @@ return view.extend({
 			if (d.active === 'static' && d.img_url && d.selected_ok && !diagState.browser) {
 				browserReach(d.img_url).then(function(ok) {
 					diagState.browser = ok ? '可达 ✓' : '不可达 ✗';
-					renderDiag();
+					renderSources();
 				});
 			}
 
@@ -655,26 +687,7 @@ return view.extend({
 			var remote = d.active === 'static' ? st.version : gh.version;
 
 			/* 双源状态展示（含 Zed-NAS 最新版本输出） */
-			/* 只输出所选源的状态行（单源探测，不再罗列未选源） */
-			var srcEl = $('opota-sources');
-			if (srcEl) {
-				var rows = [];
-				rows.push('本地版本：' + esc(d.local) + '　所选源：' + srcLabel(d.active));
-				if (d.active === 'static') {
-					rows.push('Zed-NAS：' + (st.ok
-						? '<span class="src-ok">✓ 可达</span>　最新版本 <b>' + esc(st.version || '-')
-							+ '</b>' + (st.size ? '　' + fmtBytes(st.size) : '')
-						: '<span class="src-bad">✗ 不可达</span>'));
-				} else {
-					rows.push('Zed-Github：' + (gh.ok
-						? '<span class="src-ok">✓ 可达</span>　' + esc(gh.version || '-')
-							+ (gh.tag ? '　' + esc(gh.tag) : '')
-							+ (gh.published ? '　' + esc(gh.published) : '')
-							+ (gh.size ? '　' + fmtBytes(gh.size) : '')
-						: '<span class="src-bad">✗ 不可达</span>'));
-				}
-				srcEl.innerHTML = rows.map(function(x) { return '<div>' + x + '</div>'; }).join('');
-			}
+			renderSources();
 
 			var lnk = $('opota-lnk-download');
 			if (lnk) {
