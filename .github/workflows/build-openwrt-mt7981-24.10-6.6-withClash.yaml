@@ -316,11 +316,53 @@ jobs:
         eval "$send_dingding \"${send_content2}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#92D050>${send_content2}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
         echo "::warning file=zz-nas.com::All Released Files Uploaded to ZZ-NAS"
 
+    # OTA 标准化检查：release 必须含 360T7 的 OTA 关键产物（手动下载 + 未来客户端 OTA）
+    - name: Check OTA critical files
+      id: otafiles
+      if: env.UPLOAD_RELEASE == 'true' && steps.organize.outputs.status == 'success' && !cancelled()
+      run: |
+        cd "$FIRMWARE"
+        echo "===== OTA 关键产物检查（360T7 + sha256sums） ====="
+        fail=0
+        for f in immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin sha256sums; do
+          if [ -s "$f" ]; then
+            echo "✔ $f ($(du -h "$f" | cut -f1))"
+          else
+            echo "::error::缺少 OTA 关键文件 $f"
+            fail=1
+          fi
+        done
+        if [ -f sha256sums ] && ! grep -q "immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin" sha256sums; then
+          echo "::error::sha256sums 未包含 360T7 sysupgrade 镜像"
+          fail=1
+        fi
+        [ "$fail" -eq 0 ] || exit 1
+        echo "===== 本次 release 全部产物 ====="
+        ls -lh
+
     - name: Generate release tag
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && steps.otafiles.outcome == 'success' && !cancelled()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "release_tag=$model-and-$model2-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        # 版本号取 DIY 打进固件的 Ryyyy-mm-dd（与刷机后显示的版本一致）
+        VER=$(grep -oE 'R[0-9]{4}-[0-9]{2}-[0-9]{2}' openwrt/package/emortal/default-settings/files/99-default-settings 2>/dev/null | head -n1)
+        if [ -z "$VER" ]; then
+          echo "::error::无法从 99-default-settings 解析固件版本日期"
+          exit 1
+        fi
+        TAG="OP_MT7981_Clash_${VER}"
+        echo "release_tag=$TAG" >> $GITHUB_OUTPUT
+        echo "===== Release Tag: $TAG ====="
+        # 同一天重复构建：删除当天旧 release（连同 tag 与旧产物），覆盖当天前一个
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "已存在 $TAG，删除旧 release 及 tag 以覆盖当天前一个产物"
+          gh release delete "$TAG" --yes --cleanup-tag
+        fi
+        if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+          git push origin --delete "refs/tags/$TAG"
+        fi
         touch release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
