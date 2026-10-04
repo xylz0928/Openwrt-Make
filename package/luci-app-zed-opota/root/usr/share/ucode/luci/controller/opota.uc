@@ -76,6 +76,11 @@ return {
 			+ (t != "" ? " " + t : ""));
 	},
 
+	/* 来源可达性诊断：路由器侧 github.com 主站 / 静态站 连通性（零 API 配额） */
+	act_diag: function() {
+		relay("diag");
+	},
+
 	act_progress: function() {
 		relay("progress");
 	},

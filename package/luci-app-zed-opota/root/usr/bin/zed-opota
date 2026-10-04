@@ -683,12 +683,26 @@ do_log() {
 	emit "{\"ok\":true,\"lines\":[${out}]}"
 }
 
+# 来源可达性诊断（2026-10-04 双侧检测：浏览器侧由前端自测，路由器侧走这里）。
+# 只做 HEAD 连通性：github.com 主站（不耗 API 配额）+ 静态站固件头
+do_diag() {
+	local gh=false st=false
+	if curl -sI --max-time 5 -o /dev/null "https://github.com/" 2>/dev/null; then
+		gh=true
+	fi
+	if [ -n "$STATIC_IMG_URL" ] && curl -sI --max-time 5 -o /dev/null "$STATIC_IMG_URL" 2>/dev/null; then
+		st=true
+	fi
+	emit "{\"ok\":true,\"github\":${gh},\"static\":${st}}"
+}
+
 # ---------- 入口 ----------
 cmd=${1:-}
 [ $# -gt 0 ] && shift
 
 case "$cmd" in
 check)		do_check "${1:-}" "${2:-}" ;;
+diag)		do_diag ;;
 space)		do_space "${1:-0}" ;;
 download)	do_download "${1:-0}" "${2:-}" "${3:-}" ;;
 progress)	do_progress ;;

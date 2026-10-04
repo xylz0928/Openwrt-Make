@@ -33,6 +33,8 @@ var CSS = [
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
 	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;}',
+	'#zed-opota .opota-diag{display:none;margin-top:5px;font-size:11px;line-height:1.65;opacity:.86;word-break:break-all}',
+	'#zed-opota .opota-diag.show{display:block}',
 	'#zed-opota .opota-sub{margin-top:6px;font-size:12px;font-weight:500;opacity:.9;',
 	'  font-family:Menlo,Consolas,monospace;word-break:break-all}',
 	'#zed-opota .opota-ring{display:inline-block;width:18px;height:18px;flex-shrink:0}',
@@ -148,6 +150,54 @@ function fmtBytes(n) {
 function esc(s) {
 	return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
 		return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+	});
+}
+
+/* ============ 双侧来源检测（2026-10-04 用户需求）============
+ * 浏览器侧：前端自身请求的实测结果（GitHub=查询结果；NAS=no-cors 探测）
+ * 路由器侧：后端 diag 端点 HEAD 实测（github.com 主站/静态站，零 API 配额）
+ * 出问题时用户看这一行即可分辨是"我浏览器的网络"还是"路由器的网络" */
+var diagState = { browser: null, router: null, note: '' };
+
+function renderDiag() {
+	var el = $('opota-diag');
+	if (!el) return;
+	var parts = [];
+	if (diagState.browser) parts.push('浏览器侧：' + diagState.browser);
+	if (diagState.router) parts.push('路由器侧：' + diagState.router);
+	if (!parts.length) { el.textContent = ''; el.className = 'opota-diag'; return; }
+	el.className = 'opota-diag show';
+	el.textContent = '来源检测 · ' + parts.join(' · ') + (diagState.note ? '　' + diagState.note : '');
+}
+
+function diagReset() {
+	diagState = { browser: null, router: null, note: '' };
+	renderDiag();
+}
+
+function shortDiagReason(err) {
+	var m = (err && err.message) || '';
+	if (m.indexOf('限流') >= 0) return '限流（60次/小时）';
+	if (m.indexOf('超时') >= 0) return '超时';
+	if (m.indexOf('无法访问') >= 0) return '不可达';
+	return '查询失败';
+}
+
+/* 浏览器侧连通性自测（no-cors 只判可达，不读内容、不看配额） */
+function browserReach(url) {
+	return new Promise(function(resolve) {
+		var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+		var done = false;
+		var timer = setTimeout(function() { if (!done) { done = true; resolve(false); } }, 8000);
+		var opts = { mode: 'no-cors', cache: 'no-store' };
+		if (ctl) opts.signal = ctl.signal;
+		fetch(url, opts).then(function() {
+			if (done) return;
+			done = true; clearTimeout(timer); resolve(true);
+		}).catch(function() {
+			if (done) return;
+			done = true; clearTimeout(timer); resolve(false);
+		});
 	});
 }
 
@@ -331,9 +381,10 @@ return view.extend({
 
 		/* 型号行：加载即显示（与 108M 校验同路径落位） */
 		var modelLine = E('div', { 'class': 'opota-model', 'id': 'opota-model' }, ['']);
+		var diagLine = E('div', { 'class': 'opota-diag', 'id': 'opota-diag' }, ['']);
 
 		var card = E('div', { 'class': 'opota-card', 'id': 'opota-card' }, [
-			msg, modelLine, sub, sources,
+			msg, modelLine, sub, sources, diagLine,
 			/* 更新操作紧贴版本输出（更靠近检查更新行） */
 			updateRow,
 			srcPick, result,
@@ -435,6 +486,7 @@ return view.extend({
 
 	/* 108M 方案不匹配：一进页面（progress 路径）即外显拒绝，无需点检查更新 */
 	showIncompatible: function(d) {
+		diagReset();
 		showModel(d);
 		this.setStatus('err', '固件方案不匹配');
 		this.showUpdateRow(false);
@@ -448,6 +500,7 @@ return view.extend({
 	/* 检查更新。source=null → 不带参数，后端按型号默认源（进页自动检查走这条） */
 	onSourceChange: function() {
 		if (busy) return;   /* 检查中点击：连选中视觉都不改，防状态错位 */
+		diagReset();
 		document.querySelectorAll('#zed-opota .opota-chip').forEach(function(c) {
 			var input = c.querySelector('input');
 			c.className = 'opota-chip' + (input && input.checked ? ' on' : '');
@@ -465,9 +518,22 @@ return view.extend({
 		self.setStatusRing('checking', '正在检查更新（'
 			+ (sel ? srcLabel(sel) : '按型号默认源') + '）…', null);
 		self.setSub('');
+		/* 路由器侧诊断与检查并行发起（独立端点，结果进"来源检测"行） */
+		api('diag', null, 15000).then(function(g) {
+			if (!g || !g.ok) return;
+			diagState.router = (sel === 'static')
+				? (g.static ? '可达 ✓' : '不可达 ✗')
+				: (g.github ? '可达 ✓' : '不可达 ✗');
+			renderDiag();
+		}).catch(function() {
+			diagState.router = '检测失败';
+			renderDiag();
+		});
+
 		var req;
 		if (!sel || sel === 'github') {
-			/* pushbot 模式：GitHub 检查由浏览器发起，tag 交给后端（零 API） */
+			/* pushbot 模式：默认浏览器发起（零路由器配额）；
+			   失败（限流/超时/网络）→ 回退后端 gh_probe 代查（用户指定的回退路径） */
 			var profP = (cachedProfile
 				? Promise.resolve(cachedProfile)
 				: api('progress', null, 10000).then(function(p) {
@@ -475,13 +541,21 @@ return view.extend({
 					return cachedProfile || 'x86-efi';
 				}));
 			req = profP.then(function(prof) {
-				return ghDiscover(prof);
-			}).then(function(info) {
-				self._ghInfo = info;
-				lastGhTag = info.tag || '';
-				return api('check', info.tag
-					? { source: 'github', tag: info.tag }
-					: { source: 'github' }, 30000);
+				return ghDiscover(prof).then(function(info) {
+					diagState.browser = '可达 ✓';
+					diagState.note = '';
+					renderDiag();
+					self._ghInfo = info;
+					lastGhTag = info.tag || '';
+					return api('check', info.tag
+						? { source: 'github', tag: info.tag }
+						: { source: 'github' }, 30000);
+				}).catch(function(err) {
+					diagState.browser = shortDiagReason(err);
+					diagState.note = '（浏览器侧失败，本次由路由器代查）';
+					renderDiag();
+					return api('check', { source: 'github' }, 30000);
+				});
 			});
 		} else {
 			req = api('check', { source: sel }, 30000);
@@ -499,6 +573,19 @@ return view.extend({
 			lastCheck = d;
 			showModel(d);
 
+			/* 回退路径（后端代查成功）：从响应回收 tag，保证拉取仍走 tag 直连 */
+			if (d.active === 'github' && d.sources && d.sources.github
+				&& d.sources.github.ok && d.sources.github.tag)
+				lastGhTag = d.sources.github.tag;
+
+			/* 静态源：补一次浏览器侧连通性探测（no-cors） */
+			if (d.active === 'static' && d.img_url && d.selected_ok && !diagState.browser) {
+				browserReach(d.img_url).then(function(ok) {
+					diagState.browser = ok ? '可达 ✓' : '不可达 ✗';
+					renderDiag();
+				});
+			}
+
 			/* 108M 方案不匹配（后端在加载/检查两路都会给出）→ 直接拒绝 */
 			if (d.flash_compatible === false) {
 				self.showIncompatible(d);
@@ -507,6 +594,7 @@ return view.extend({
 
 			/* 型号未开放 OTA（如未适配的 mediatek 板）：明确提示，不渲染源状态 */
 			if (d.supported === false) {
+				diagReset();
 				self.setStatus('err', '该型号暂未开放在线升级');
 				self.showUpdateRow(false);
 				var ln0 = $('opota-lnk-download');
