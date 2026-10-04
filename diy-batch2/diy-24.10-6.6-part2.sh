@@ -398,3 +398,29 @@ git clone --depth=1 https://github.com/vernesong/OpenClash.git package/luci-app-
 # 取自 @AmadeusGhost， 原更新内容为 generic: limit commit "ramips/mediatek: improve GRO performance, fix PPE packet parsing" to mediatek target only
 # wget https://github.com/AmadeusGhost/lede/commit/7a49d2cf99bd59506bbd9239e0bde81a61f93c40.patch
 # git apply 7a49d2cf99bd59506bbd9239e0bde81a61f93c40.patch
+
+# ===== OTA 插件挂载（2026-10-04，复刻 x86 已验证方案）=====
+# 构建树内取 luci-app-zed-opota：本地仓库 → GITHUB_WORKSPACE → GitHub 归档，三级回退
+OTA_PKG=luci-app-zed-opota
+REPO_ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
+mkdir -p package
+if [ -d "$REPO_ROOT/package/$OTA_PKG" ]; then
+	cp -r "$REPO_ROOT/package/$OTA_PKG" package/
+elif [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE/package/$OTA_PKG" ]; then
+	cp -r "$GITHUB_WORKSPACE/package/$OTA_PKG" package/
+else
+	echo "==> 本地未找到 $OTA_PKG，从 GitHub 归档获取"
+	wget -qO /tmp/opota.tar.gz \
+		"https://github.com/xylz0928/Openwrt-Make/archive/refs/heads/main.tar.gz" &&
+		tar -xzf /tmp/opota.tar.gz -C /tmp "Openwrt-Make-main/package/$OTA_PKG" &&
+		cp -r "/tmp/Openwrt-Make-main/package/$OTA_PKG" package/ &&
+		rm -rf /tmp/Openwrt-Make-main /tmp/opota.tar.gz ||
+		{ echo "错误：获取 $OTA_PKG 失败，OTA 将不可用"; exit 1; }
+fi
+# 复制结果校验：Makefile 缺失即失败（避免静默出无 OTA 的固件）
+[ -f "package/$OTA_PKG/Makefile" ] ||
+	{ echo "错误：$OTA_PKG 复制不完整（缺 Makefile），构建终止"; exit 1; }
+# 确保 .config 启用（MakeMenu.mt7981.24.10.6.6.config 已含此行时幂等）
+grep -q '^CONFIG_PACKAGE_luci-app-zed-opota=y' .config 2>/dev/null ||
+	echo 'CONFIG_PACKAGE_luci-app-zed-opota=y' >> .config
+echo "==> $OTA_PKG 已就位"
