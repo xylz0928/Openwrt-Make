@@ -588,7 +588,7 @@ return view.extend({
 					+ '。\n点"立即更新"下载并校验固件。', 'info');
 			} else if (rel === 'equal') {
 				self.setStatus('latest', '与线上版本一致（' + loc + '）');
-				self.setSub('经 ' + srcLabel(d.active) + ' 查询　同日重编译会覆盖同日产物');
+				self.setSub('经 ' + srcLabel(d.active) + ' 查询');
 				self.showResult('版本提示：与线上一致。\n仍可下载并刷写（重刷/救砖均可），是否刷写请自行判断。', 'ok');
 			} else {
 				self.setStatus('ready', '本地版本高于线上');
@@ -768,7 +768,7 @@ return view.extend({
 			self.setStatus('err', '下载/校验失败');
 			if ((d.error || '').indexOf('校验失败') >= 0) {
 				self.showResult('下载成功但固件校验失败，已删除下载产物。\n'
-					+ '请稍后重试（同日多次编译的 release 可能正在被覆盖）。', 'err');
+					+ '请稍后重试。', 'err');
 			} else {
 				self.showResult(d.error || '下载失败', 'err');
 			}
