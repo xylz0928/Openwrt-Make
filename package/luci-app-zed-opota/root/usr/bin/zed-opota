@@ -38,7 +38,10 @@ MARGIN=$((4 * 1024 * 1024))	# 4MB 余量
 # Zed-NAS（静态站）
 STATIC_VER_URL="https://static.z.7ze.top:20443/files/build_date_openwrt.txt"
 STATIC_IMG_URL="https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz"
-STATIC_SHA_URL="https://static.z.7ze.top:20443/files/sha256sums"
+# 统一命名（2026-10-04 与 NAS 脚本对齐）：Zed-NAS 的校验用每产物专属文件
+# <固件名>.sha256sums（NAS write_product_sha 生成、按 static 文件名改写），
+# 不再用混合多产品的共享 sha256sums；将来 360T7 profile 沿用同一派生规则
+STATIC_SHA_URL="${STATIC_IMG_URL}.sha256sums"
 STATIC_ASSET="OpenWrt-x64.img.gz"
 
 mkdir -p "$WORK"
