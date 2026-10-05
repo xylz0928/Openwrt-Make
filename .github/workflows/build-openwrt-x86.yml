@@ -354,11 +354,65 @@ jobs:
         retain_days: 1
         keep_minimum_runs: 3
 
+    - name: Prune orphan tags (tag cap = 30)
+      if: ${{ !cancelled() }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: |
+        python3 - <<'PY'
+        import os, json, urllib.request, urllib.parse, subprocess
+        repo = os.environ['GITHUB_REPOSITORY']
+        tok = os.environ['GH_TOKEN']
+        def get(u):
+            req = urllib.request.Request(u, headers={'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json'})
+            return json.load(urllib.request.urlopen(req))
+        rels = get('https://api.github.com/repos/%s/releases?per_page=100' % repo)
+        reltags = set(r['tag_name'] for r in rels)
+        out = subprocess.run(['git', 'ls-remote', '--tags', 'origin'], capture_output=True, text=True).stdout
+        tags = [l.split('refs/tags/')[1] for l in out.splitlines() if 'refs/tags/' in l and '^{}' not in l]
+        orphans = [t for t in tags if t not in reltags]
+        print('tags=%d releases=%d orphans=%d' % (len(tags), len(reltags), len(orphans)))
+        for t in orphans:
+            req = urllib.request.Request('https://api.github.com/repos/%s/git/refs/tags/%s' % (repo, urllib.parse.quote(t, safe='')), headers={'Authorization': 'Bearer ' + tok}, method='DELETE')
+            try:
+                urllib.request.urlopen(req)
+                print('del tag', t)
+            except Exception as e:
+                print('del fail', t, e)
+        PY
+    - name: Enforce workflow runs cap (30)
+      if: ${{ !cancelled() }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
+      run: |
+        python3 - <<'PY'
+        import os, json, urllib.request, urllib.parse
+        repo = os.environ['GITHUB_REPOSITORY']
+        ref = os.environ.get('GITHUB_WORKFLOW_REF', '')
+        wf = ref.split('/.github/workflows/')[-1].split('@')[0]
+        tok = os.environ['GH_TOKEN']
+        def get(u):
+            req = urllib.request.Request(u, headers={'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json'})
+            return json.load(urllib.request.urlopen(req))
+        runs = get('https://api.github.com/repos/%s/actions/workflows/%s/runs?per_page=100' % (repo, urllib.parse.quote(wf)))['workflow_runs']
+        extra = runs[30:]
+        print('runs=%d over30=%d' % (len(runs), len(extra)))
+        for r in extra:
+            req = urllib.request.Request('https://api.github.com/repos/%s/actions/runs/%s' % (repo, r['id']), headers={'Authorization': 'Bearer ' + tok}, method='DELETE')
+            try:
+                urllib.request.urlopen(req)
+                print('deleted', r['id'])
+            except Exception as e:
+                print('del fail', r['id'], e)
+        PY
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@v0.1.0
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        keep_latest: 9
+        keep_latest: 30
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
