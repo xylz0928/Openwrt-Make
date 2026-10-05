@@ -71,6 +71,9 @@ jobs:
         git add last_build.txt
         if git diff --cached --quiet; then echo "last_build.txt 已是最新"; exit 0; fi
         git commit -m "chore(ota): update last_build Test=$DATE"
+        # 前面步骤可能改动过跟踪文件（如 chmod +x DIY 脚本会翻转可执行位=未暂存改动）
+        # → 复位跟踪文件（CI 工作区一次性；last_build.txt 已提交不受影响），保证 rebase 干净
+        git checkout -- . || true
         git pull --rebase origin "$GITHUB_REF_NAME"
         git push origin "HEAD:$GITHUB_REF_NAME"
     - name: Initialization environment
