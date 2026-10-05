@@ -49,6 +49,7 @@ jobs:
     # 允许用 GITHUB_TOKEN 回写仓库文件（last_build.txt）
     permissions:
       contents: write
+      actions: write
     runs-on: ubuntu-latest
 
     steps:
@@ -205,3 +206,30 @@ jobs:
         
         nowtime=`date "+%Y-%m-%d %H:%M:%S"`
         eval "$send_dingding \"${send_content2}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#92D050>${send_content2}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
+    - name: Enforce workflow runs cap (30)
+      if: ${{ !cancelled() }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
+      run: |
+        python3 - <<'PY'
+        import os, json, urllib.request, urllib.parse
+        repo = os.environ['GITHUB_REPOSITORY']
+        ref = os.environ.get('GITHUB_WORKFLOW_REF', '')
+        wf = ref.split('/.github/workflows/')[-1].split('@')[0]
+        tok = os.environ['GH_TOKEN']
+        def get(u):
+            req = urllib.request.Request(u, headers={'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json'})
+            return json.load(urllib.request.urlopen(req))
+        runs = get('https://api.github.com/repos/%s/actions/workflows/%s/runs?per_page=100' % (repo, urllib.parse.quote(wf)))['workflow_runs']
+        extra = runs[30:]
+        print('runs=%d over30=%d' % (len(runs), len(extra)))
+        for r in extra:
+            req = urllib.request.Request('https://api.github.com/repos/%s/actions/runs/%s' % (repo, r['id']), headers={'Authorization': 'Bearer ' + tok}, method='DELETE')
+            try:
+                urllib.request.urlopen(req)
+                print('deleted', r['id'])
+            except Exception as e:
+                print('del fail', r['id'], e)
+        PY
