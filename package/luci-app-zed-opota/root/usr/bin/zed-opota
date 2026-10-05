@@ -190,7 +190,8 @@ curl_retry() {
 	while :; do
 		curl "$@" && return 0
 		n=$((n + 1))
-		[ "$n" -gt 3 ] && return 1
+		# OPOTA_TRY 可调尝试次数（默认3；do_diag 局部降为2做浅预算）
+		[ "$n" -gt "${OPOTA_TRY:-3}" ] && return 1
 		sleep 1
 	done
 }
@@ -251,7 +252,7 @@ profile_key() {
 lb_probe() {
 	local key out date size pub
 	key=$(profile_key) || return 1
-	out=$(curl_retry -fsSL --max-time 8 "$LB_URL" 2>/dev/null | awk -v k="$key" '
+	out=$(curl_retry -fsSL --max-time "${OPOTA_LBT:-8}" "$LB_URL" 2>/dev/null | awk -v k="$key" '
 		{
 			t = $0
 			sub(/^[ \t]+/, "", t)
@@ -359,8 +360,13 @@ gh_from_tag() {
 	[ -n "$GH_DATE" ] || return 1
 	GH_IMG_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/${IMG}"
 	GH_SHA_URL="https://github.com/${REPO}/releases/download/${GH_TAG}/sha256sums"
-	GH_SIZE=$(remote_size "$GH_IMG_URL")
-	case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac
+	# 第2参=前端(浏览器读文件)带回的体积：给定则直接用，完全省掉 HEAD
+	# （253 实机教训：路由器侧资产 HEAD 慢/超时会撑爆前端30s 等待）
+	case "${2:-}" in
+	''|*[!0-9]*) GH_SIZE=$(remote_size "$GH_IMG_URL")
+		case "$GH_SIZE" in ''|*[!0-9]*) GH_SIZE=0 ;; esac ;;
+	*) GH_SIZE=$2 ;;
+	esac
 	GH_PUB=""
 	return 0
 }
@@ -458,8 +464,8 @@ do_check() {
 	if [ "$sel" = github ]; then
 		gh_checked=true
 		if [ -n "$tag_in" ]; then
-			# 前端/CLI 传入的 tag → 零 API 构造
-			if gh_from_tag "$tag_in"; then gh_ok=true; fi
+			# 前端(浏览器读文件)传入 tag(+体积) → 零 API、零 HEAD 直接构造
+			if gh_from_tag "$tag_in" "$size_in"; then gh_ok=true; fi
 		elif lb_probe; then
 			# 后端直接读固定版本文件（零 api）
 			gh_ok=true
@@ -790,13 +796,21 @@ do_log() {
 # 只做 HEAD 连通性：github.com 主站（不耗 API 配额）+ 静态站固件头
 do_diag() {
 	local gh=false st=false
-	# github 侧 = 真实"可下载"判定：读版本文件(带重试) + 资产直链 HEAD(带重试，
-	# 会跟随跳转到 CDN —— CDN DNS 不通时这里就会判✗，与实际能否拉取一致)
-	if lb_probe && curl_retry -sIL --max-time 10 -o /dev/null "$GH_IMG_URL" 2>/dev/null; then
+	# github 侧 = 真实"可下载"判定：真 lb_probe（带行解析校验，非裸rc）+ 资产 HEAD 随跳转验 CDN。
+	# 浅预算：文件2次×4s + HEAD2次×5s + 静态2次×5s ≈ ≤21s（配合前端25s），不拖死服务端 worker
+	diag_try() {  # $1=URL $2=maxtime（固定2次）
+		local n=1
+		while [ "$n" -le 2 ]; do
+			curl -sIL --max-time "$2" -o /dev/null "$1" 2>/dev/null && return 0
+			n=$((n + 1)); sleep 1
+		done
+		return 1
+	}
+	local OPOTA_TRY=2 OPOTA_LBT=4   # 局部浅预算（动态作用域传给 curl_retry/lb_probe）
+	if lb_probe && { [ -z "${GH_IMG_URL:-}" ] || diag_try "$GH_IMG_URL" 5; }; then
 		gh=true
 	fi
-	# 静态站侧同样带重试（与检查路径同标准，消灭单次 HEAD 的假阴性）
-	if [ -n "$STATIC_IMG_URL" ] && curl_retry -sI --max-time 5 -o /dev/null "$STATIC_IMG_URL" 2>/dev/null; then
+	if [ -n "$STATIC_IMG_URL" ] && diag_try "$STATIC_IMG_URL" 5; then
 		st=true
 	fi
 	emit "{\"ok\":true,\"github\":${gh},\"static\":${st}}"
