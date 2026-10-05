@@ -132,7 +132,7 @@ function api(name, params, timeoutMs) {
 			.catch(function(e) {
 				clearTimeout(timer);
 				if (e && e.name === 'AbortError') {
-					e = new Error('请求超时（>' + t + 's 未收到响应；服务端日志可对照是否实际完成）');
+					e = new Error('请求超时（>' + Math.round(t / 1000) + 's 未收到响应；服务端日志可对照是否实际完成）');
 					e.kind = 'timeout';
 				}
 				if (e && typeof e.message === 'string' && e.message.indexOf('URL:') < 0)
@@ -712,7 +712,7 @@ return view.extend({
 	fireRouterDiag: function(sel) {
 		var self = this;
 		var mySeq = ++diagSeq;
-		api('diag', null, 15000).then(function(g) {
+		api('diag', null, 25000).then(function(g) {
 			if (mySeq !== diagSeq) return;
 			if (!g || !g.ok) diagState.router = '检测失败';
 			else diagState.router = (sel === 'static')
@@ -784,6 +784,10 @@ return view.extend({
 					self.fireRouterDiag('github');
 					var gq = { source: 'github' };
 					if (selFwFamily) gq.fw = selFwFamily;
+					/* 浏览器已读到文件 → tag/size 随请求带回（后端零 curl/零 HEAD 秒回，
+					   根治253实机：后端自取+重试叠满撑爆30s 超时） */
+					if (info && info.tag) gq.tag = info.tag;
+					if (info && info.size > 0) gq.size = info.size;
 					return api('check', gq, 30000);
 				}).catch(function(err) {
 					diagState.browser = shortDiagReason(err);
