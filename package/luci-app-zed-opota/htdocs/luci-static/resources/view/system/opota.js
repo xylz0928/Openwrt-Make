@@ -33,6 +33,8 @@ var CSS = [
 	'#zed-opota .opota-card.is-err,#zed-opota .opota-card.is-installing{background:linear-gradient(135deg,#ef4444,#dc2626)}',
 	'#zed-opota .opota-msg{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;line-height:1.5}',
 	'#zed-opota .opota-model{margin-top:5px;font-size:11.5px;line-height:1.6;opacity:.92;}',
+	'#zed-opota .opota-count{display:inline-block;margin-left:6px;font-size:22px;font-weight:800;color:#fde68a;vertical-align:middle;letter-spacing:.5px}',
+	'#zed-opota .opota-count.expired{font-size:11.5px;font-weight:400;color:#fecaca;letter-spacing:0}',
 	'#zed-opota .opota-fwsrc{margin-left:6px;white-space:nowrap}',
 	'#zed-opota .opota-fwsrc.hidden{display:none}',
 	'#zed-opota .opota-fwchip{display:inline-block;padding:1px 9px;border-radius:9px;border:1px solid rgba(255,255,255,.4);font-size:10.5px;cursor:pointer;opacity:.72;margin-left:5px;user-select:none}',
@@ -293,6 +295,70 @@ var LB_URL = 'https://raw.githubusercontent.com/' + GH_REPO + '/main/last_build.
 var GH_KEY = { 'x86-efi': 'x86_Official', '360t7-108m': 'MT7981' };
 var cachedProfile = null;
 var selFwFamily = null;   /* x86 固件家族：null=按识别值；手动点击后固定 */
+
+/* ── 刷机倒计时与自动恢复（2026-10-05 用户设计）：
+   文案后追加大号倒计时（默认240s），每5s探测后端一次，
+   任何HTTP响应（哪怕403会话失效）= 设备已回来 → 自动刷新页面 */
+var FLASH_DEFAULT = 240;
+var flashTimer = null, flashLeft = 0, flashPollN = 0;
+var flashProbing = false;   /* 单次探测进行中（防重入） */
+var flashReloaded = false;  /* 已确认设备回来（探测成功后置位） */
+
+function clearCountdownEl() {
+	var el = $('opota-count');
+	if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
+function stopFlashCountdown() {
+	if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
+}
+
+/* 每5s探测：不解析内容（403 HTML 也代表设备在线），仅看“有没有响应” */
+function probeDevice() {
+	/* 2026-10-05 修：进行中(防重入)与已完成必须分标志——
+	   否则首次失败会永久闩死，设备回来了也永远探不到 */
+	if (flashReloaded || flashProbing) return;
+	flashProbing = true;
+	var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+	var timer = setTimeout(function() { if (ctl) { try { ctl.abort(); } catch (e) {} } }, 4000);
+	var opts = { cache: 'no-store' };
+	if (ctl) opts.signal = ctl.signal;
+	fetch(adminBase() + 'system/opota/progress?_t=' + Date.now(), opts).then(function() {
+		clearTimeout(timer);
+		flashProbing = false;
+		flashReloaded = true;
+		stopFlashCountdown();
+		/* 稍顿半秒让状态收尾，再刷新 */
+		setTimeout(function() { window.location.reload(); }, 300);
+	}).catch(function() {
+		clearTimeout(timer);
+		flashProbing = false;   /* 仍不可达 → 下个5s继续探 */
+	});
+}
+
+function startFlashCountdown() {
+	stopFlashCountdown();
+	clearCountdownEl();
+	flashLeft = FLASH_DEFAULT;
+	flashPollN = 0;
+	flashProbing = false;
+	flashReloaded = false;
+	/* 在“正在刷机…”文案后插入大号倒计时 */
+	var m = $('opota-msg');
+	if (m) m.innerHTML = m.innerHTML + ' <span class="opota-count" id="opota-count">' + FLASH_DEFAULT + 's</span>';
+	flashTimer = setInterval(function() {
+		flashLeft--;
+		var el = $('opota-count');
+		if (flashLeft < 0) {
+			stopFlashCountdown();
+			if (el) { el.className = 'opota-count expired'; el.textContent = '（倒计时结束，如设备未恢复请手动刷新）'; }
+			return;
+		}
+		if (el) el.textContent = flashLeft + 's';
+		flashPollN++;
+		if (flashPollN % 5 === 0) probeDevice();
+	}, 1000);
+}
 
 /* 检查编排：缓存 → 层1 raw 直读（零配额）→ 层2 api（回退）。unsupported 空 tag 哨兵 */
 function ghDiscover(profile) {
@@ -1038,6 +1104,8 @@ return view.extend({
 			self.setSub('校验中');
 			break;
 		case 'failed':
+			stopFlashCountdown();
+			clearCountdownEl();
 			self.stopPolling();
 			self.setBusy(false);
 			self.setStatus('err', '下载/校验失败');
@@ -1071,6 +1139,7 @@ return view.extend({
 		case 'installing':
 			self.stopPolling();
 			self.setStatus('installing', '正在刷机，设备即将重启…');
+			startFlashCountdown();
 			break;
 		}
 	},
@@ -1099,11 +1168,12 @@ return view.extend({
 				return;
 			}
 			self.setStatus('installing', '正在刷机，设备即将重启…');
+			startFlashCountdown();
 			self.setSub('请勿关闭电源');
 			self.showUpdateRow(false);
 			self.showResult('系统正在刷入新固件，请勿关闭电源！页面将在设备重启后自动恢复连接。', 'err');
-			/* 与官方 flash 页一致：保留配置路径的断线重连 */
-			ui.awaitReconnect(window.location.host);
+			/* 2026-10-05：改用自研倒计时+5s轮询自动刷新（替代 ui.awaitReconnect，
+			   避免其行为遮挡可见倒计时）；上面已 startFlashCountdown() */
 		}).catch(function(e) {
 			self.setBusy(false);
 			self.setStatus('err', '刷机未启动');
@@ -1122,6 +1192,11 @@ return view.extend({
 				if (ub) ub.style.display = 'none';
 				self.onProgress(d);
 				self.startPolling();
+			} else if (d.stage === 'installing') {
+				self.setStatus('installing', '正在刷机，设备即将重启…');
+				self.setSub('请勿关闭电源');
+				self.showUpdateRow(false);
+				startFlashCountdown();
 			} else if (d.stage === 'ready') {
 				self.showUpdateRow(true);
 				var ub2 = $('opota-btn-update');
