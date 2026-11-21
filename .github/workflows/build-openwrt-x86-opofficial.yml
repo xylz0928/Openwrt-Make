@@ -342,7 +342,7 @@ jobs:
           exit 1
         fi
         DATE="$VER"
-        SIZE=$("$FIRMWARE/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" 2>/dev/null || echo 0)
+        SIZE=$(stat -c%s "$FIRMWARE/openwrt-x86-64-generic-squashfs-combined-efi.img.gz" 2>/dev/null || echo 0)
         PUB=$(date -u +%FT%TZ)
         LINE="x86_Official=$DATE $SIZE $PUB"
         if [ -f last_build.txt ]; then
