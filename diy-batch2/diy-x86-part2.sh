@@ -290,6 +290,9 @@ git clone https://github.com/sirpdboy/luci-app-advanced package/luci-app-advance
 
 # Add luci-app-netspeedtest
 git clone https://github.com/sirpdboy/netspeedtest package/netspeedtest
+# 剔除 python3-pkg-resources 依赖：上游 python feed 已删该包（setuptools 拆分产物），
+# 依赖悬空导致镜像组装期 cannot find dependency（run #711）；仓库内无任何 pkg_resources 引用，剔除零风险
+sed -i 's/ +python3-pkg-resources//g' package/netspeedtest/luci-app-netspeedtest/Makefile
 
 # Add Bandix
 git clone https://github.com/timsaya/luci-app-bandix package/luci-app-bandix
