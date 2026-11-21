@@ -8,6 +8,17 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part1.sh
 # Description: OpenWrt DIY script part 1 (Before Update feeds)
+
+# ubuntu-26.04 新 runner 镜像的 install --version 输出不再含 "GNU"，
+# 源树 prereq 的 `install --version | grep GNU` 会误杀整个构建（表现为
+# "Please install GNU 'install'" 后每次 make 均在 prereq 阶段失败）。
+# 此处放宽为只验证 install 可用，并打印真实输出留档便于追踪。
+if [ -f include/prereq-build.mk ] && grep -q "install --version | grep GNU" include/prereq-build.mk; then
+	sed -i 's/install --version | grep GNU/install --version/g' include/prereq-build.mk
+	sed -i 's/ginstall --version | grep GNU/ginstall --version/g' include/prereq-build.mk
+	echo "[prereq] install check relaxed for new runner image"
+fi
+echo "[prereq-diag] install --version => $(install --version 2>&1 | head -1)"
 #
 
 # Uncomment a feed source
