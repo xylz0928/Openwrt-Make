@@ -381,7 +381,7 @@ jobs:
           exit 1
         fi
         DATE="$VER"
-        SIZE=$("$FIRMWARE/immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin" 2>/dev/null || echo 0)
+        SIZE=$(stat -c%s "$FIRMWARE/immortalwrt-mediatek-filogic-qihoo_360t7_108M-squashfs-sysupgrade.bin" 2>/dev/null || echo 0)
         PUB=$(date -u +%FT%TZ)
         LINE="MT7981=$DATE $SIZE $PUB"
         if [ -f last_build.txt ]; then
