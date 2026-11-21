@@ -74,38 +74,25 @@ jobs:
         df -hT
         echo "=============================================================================="
 
-    - name: "Optimize Disk Space"
-      uses: "hugoalh/disk-space-optimizer-ghaction@v0.8.1"
-      with:
-        operate_sudo: "True"
-        general_include: ".+"
-        general_exclude: |-
-          ^GCC$
-          ^G\+\+$
-          Clang
-          LLVM
-        docker_include: ".+"
-        docker_prune: "True"
-        docker_clean: "True"
-        apt_prune: "True"
-        apt_clean: "True"
-        homebrew_prune: "True"
-        homebrew_clean: "True"
-        npm_prune: "True"
-        npm_clean: "True"
-        os_swap: "True"
-
-#    - name: Freeing up disk space
-#      uses: easimon/maximize-build-space@master
-#      with: 
-#        root-reserve-mb: 3072
-#        swap-size-mb: 1
-#        remove-dotnet: 'true'
-#        remove-android: 'true'
-#        remove-haskell: 'true'
-#        remove-codeql: 'true'
-#        remove-docker-images: 'true'
-
+    - name: Free up disk space
+      run: |
+        set -u
+        echo "===== df BEFORE ====="
+        df -hT /
+        # 等效替代 hugoalh/disk-space-optimizer-ghaction@v0.8.1：
+        # 其 PowerShell 主体因 hugoalh.GitHubActionsToolkit 模块缺失从未执行
+        # （仅产生 3 条错误注解），此处直接删除 runner 预装大目录并清理 docker 缓存。
+        # 保留 GCC/G++/Clang/LLVM（构建所需）。
+        for d in /usr/local/lib/android /opt/ghc /opt/ghcup /usr/local/.ghcup \
+                 /usr/share/dotnet /usr/local/share/dotnet \
+                 /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/boost \
+                 /usr/local/share/boost; do
+          if [ -e "$d" ]; then sudo rm -rf "$d" || true; fi
+        done
+        sudo docker image prune -af >/dev/null 2>&1 || true
+        sudo docker system prune -f >/dev/null 2>&1 || true
+        echo "===== df AFTER ====="
+        df -hT /
     - name: Free up disk space complete
       run: |
         echo "Free up disk space complete"
@@ -257,7 +244,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -347,13 +334,6 @@ jobs:
         nowtime=`date "+%Y-%m-%d %H:%M:%S"`
         eval "$send_dingding \"${send_content2}\",\"text\":\"${nowtime} $markdown_splitline #### <font color=#92D050>${send_content2}</font>\n\n[点此链接查看](${GITHUB_WORKFLOW_URL})\"}}'"
         echo "::warning file=zz-nas.com::All Released Files Uploaded to ZZ-NAS"
-        
-    - name: Delete workflow runs
-      uses: xylz0928/delete-workflow-runs@main
-      with:
-        retain_days: 1
-        keep_minimum_runs: 3
-
     - name: Prune orphan tags (tag cap = 30)
       if: ${{ !cancelled() }}
       env:
@@ -409,7 +389,7 @@ jobs:
                 print('del fail', r['id'], e)
         PY
     - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@v0.1.0
+      uses: dev-drprasad/delete-older-releases@v0.3.4
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
         keep_latest: 30
