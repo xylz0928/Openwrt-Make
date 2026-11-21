@@ -109,8 +109,14 @@ sed -i "s/timestamp/Built on '$(TZ=Asia/Shanghai date +%Y-%m-%d -d +"5"hours)' b
 # rm -rf ./package/lean/luci-theme-argon 
 rm -rf ./feeds/luci/themes/luci-theme-argon
 git clone https://github.com/jerrykuku/luci-theme-argon.git ./package/luci-theme-argon
-git clone https://github.com/jerrykuku/luci-app-argon-config.git ./package/luci-app-argon-config
+# 应用只保留主题自带的 compat/ 子包（jerrykuku 已将应用吸收进主题，openwrt 上游 feed 亦已退役该应用）；
+# feed 旧版应用 / 独立 clone 会与主题内置文件互斥（opkg check_data_file_clashes，run #119），
+# 且主题 i18n 依赖应用包（run #121），故只保留 compat 来源、清除其余两处
+rm -rf ./feeds/luci/applications/luci-app-argon-config
+rm -f ./package/feeds/luci/luci-app-argon-config
 
+# [D′] 独立 clone 已停用：应用由主题仓 compat/ 子包提供
+# git clone https://github.com/jerrykuku/luci-app-argon-config.git ./package/luci-app-argon-config
 # Change default BackGround img
 # rm ./package/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg
 wget -O ./package/luci-theme-argon/htdocs/luci-static/argon/img/bg1.jpg https://github.com/xylz0928/luci-mod/raw/main/Background/MontereyDark.jpg
