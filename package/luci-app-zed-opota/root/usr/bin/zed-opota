@@ -251,7 +251,20 @@ fail() {
 
 # ---------- 通用数据源 ----------
 local_ver() {
-	grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' "$RELEASE_FILE" 2>/dev/null | head -n1
+	local v y m d
+	# 老式盖章：R2026-08-15（YYYY-MM-DD）
+	v=$(grep -o 'R[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' "$RELEASE_FILE" 2>/dev/null | head -n1)
+	if [ -n "$v" ]; then echo "$v"; return 0; fi
+	# 新式 LEDE 盖章：R26.11.22（YY.MM.DD，如2026-11-22 镜像）→ 归一为 R20YY-MM-DD
+	v=$(grep -o 'R[0-9]\{2\}\.[0-9]\{2\}\.[0-9]\{2\}' "$RELEASE_FILE" 2>/dev/null | head -n1)
+	if [ -n "$v" ]; then
+		y=$(echo "${v#R}" | cut -d. -f1)
+		m=$(echo "${v#R}" | cut -d. -f2)
+		d=$(echo "${v#R}" | cut -d. -f3)
+		echo "R20${y}-${m}-${d}"
+		return 0
+	fi
+	return 1
 }
 
 # 固定版本文件（2026-10-04 用户指令：前端与后端【都直接读它】取本固件最后一次
