@@ -293,6 +293,15 @@ var GH_TTL = 300000;
    由各 workflow 编译成功后写回，日期与 tag 同源于固件盖章的 CST 值） */
 var LB_URL = 'https://raw.githubusercontent.com/' + GH_REPO + '/main/last_build.txt';
 var GH_KEY = { 'x86-efi': 'x86_Official', '360t7-108m': 'MT7981' };
+/* 产物线感知（2026-11-22 LEDE 接线）：x86-efi + 识别/手动为 lede 时换键与前缀 */
+function ghKeyOf(profile) {
+	if (profile === 'x86-efi' && selFwFamily === 'lede') return 'x86_LEDE';
+	return GH_KEY[profile];
+}
+function ghPrefixOf(profile) {
+	if (profile === 'x86-efi' && selFwFamily === 'lede') return 'OP_x86_LEDE_';
+	return GH_PREFIX[profile];
+}
 var cachedProfile = null;
 var selFwFamily = null;   /* x86 固件家族：null=按识别值；手动点击后固定 */
 
@@ -363,7 +372,8 @@ function startFlashCountdown() {
 /* 检查编排：缓存 → 层1 raw 直读（零配额）→ 层2 api（回退）。unsupported 空 tag 哨兵 */
 function ghDiscover(profile) {
 	if (!GH_PREFIX[profile]) return Promise.resolve({ tag: '', published: '', size: 0, ts: 0 });
-	var ck = 'zed-opota-gh-' + profile;
+	/* 缓存键带产物线：官方线与 LEDE 线互不串 */
+	var ck = 'zed-opota-gh-' + profile + '|' + (selFwFamily || '');
 	try {
 		var c = JSON.parse(sessionStorage.getItem(ck) || 'null');
 		if (c && c.tag && (Date.now() - c.ts) < GH_TTL) return Promise.resolve(c);
@@ -378,7 +388,7 @@ function ghDiscover(profile) {
 
 /* 层1：raw last_build.txt 直读（免配额，pushbot 同款通道） */
 function lbDiscover(profile) {
-	var key = GH_KEY[profile];
+	var key = ghKeyOf(profile);
 	if (!key) return Promise.reject(new Error('lb-no-key'));
 	return new Promise(function(resolve, reject) {
 		var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
@@ -427,7 +437,7 @@ function lbDiscover(profile) {
 				fin(ke, true);
 				return;
 			}
-			fin({ tag: GH_PREFIX[profile] + 'R' + date, date: date, size: size, published: pub, ts: Date.now(), via: 'raw' }, false);
+			fin({ tag: ghPrefixOf(profile) + 'R' + date, date: date, size: size, published: pub, ts: Date.now(), via: 'raw' }, false);
 		}).catch(function() {
 			var ne = new Error('版本文件不可达（raw.githubusercontent.com 网络错误）');
 			ne.short = '不可达';

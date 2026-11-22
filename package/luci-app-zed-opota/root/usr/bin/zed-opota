@@ -178,6 +178,26 @@ else
 	# 统一命名（与 NAS write_product_sha 对齐）：<固件名>.sha256sums
 	STATIC_SHA_URL="${STATIC_IMG_URL}.sha256sums"
 	STATIC_ASSET=$(basename "$STATIC_IMG_URL")
+
+	# 产物线接线（2026-11-22）：x86-efi 按家族切换 tag 前缀与 NAS 静态两件套；
+	# 资产名两线同名（openwrt-x86-64-generic-squashfs-combined-efi.img.gz）故 asset 不变。
+	# FW_LINE=当前生效线（识别家族为初值；check/download 收到显式 fw 时可重接）
+	FW_LINE="$FAMILY"
+	wire_fw_line() {
+		case "$1" in
+		lede)
+			TAG_PREFIX="OP_x86_LEDE_"
+			STATIC_VER_URL="https://static.z.7ze.top:20443/files/build_date_lede.txt"
+			STATIC_IMG_URL="https://static.z.7ze.top:20443/files/LEDE-x64.img.gz" ;;
+		*)
+			TAG_PREFIX="OP_x86_Official_"
+			STATIC_VER_URL="https://static.z.7ze.top:20443/files/build_date_openwrt.txt"
+			STATIC_IMG_URL="https://static.z.7ze.top:20443/files/OpenWrt-x64.img.gz" ;;
+		esac
+		STATIC_SHA_URL="${STATIC_IMG_URL}.sha256sums"
+		STATIC_ASSET=$(basename "$STATIC_IMG_URL")
+	}
+	[ "$PROFILE" = "x86-efi" ] && wire_fw_line "$FW_LINE"
 	DEFAULT_SRC=$(profile_conf default_src)
 fi
 
@@ -240,6 +260,11 @@ LB_URL="https://raw.githubusercontent.com/${REPO}/main/last_build.txt"
 
 # 产品线 → 版本文件行键
 profile_key() {
+	# 固定文件键随产物线切换：LEDE 线读 x86_LEDE 行
+	if [ "$PROFILE" = "x86-efi" ] && [ "$FW_LINE" = "lede" ]; then
+		echo "x86_LEDE"
+		return 0
+	fi
 	case "$PROFILE" in
 	x86-efi) echo "x86_Official" ;;
 	360t7-108m) echo "MT7981" ;;
@@ -417,6 +442,11 @@ do_check() {
 	*) fam=""; src_in=${1:-}; tag_in=${2:-}; size_in=${3:-} ;;
 	esac
 	[ -n "$fam" ] || fam=$FAMILY
+	# 显式 fw 与当前线不同 → 重接线（tag 前缀/静态两件套/固定文件键随之切换）
+	if [ "$PROFILE" = "x86-efi" ] && [ "$fam" != "$FW_LINE" ]; then
+		FW_LINE=$fam
+		wire_fw_line "$fam"
+	fi
 	local_v=$(local_ver)
 	[ -n "$local_v" ] || fail "无法读取本地固件版本"
 
@@ -437,16 +467,7 @@ do_check() {
 		exit 0
 	fi
 
-	# LEDE 家族：尚未提供固件源（用户 2026-10-04：选中/识别到 LEDE 时提示期待）
-	if [ "$fam" = "lede" ]; then
-		log_line "检查更新：LEDE 固件源尚未提供（本地 ${local_v}）"
-		emit "{\"ok\":true,\"local\":\"$(jesc "$local_v")\",\"profile\":\"${PROFILE}\"," \
-			"\"supported\":true,\"flash_compatible\":true,\"family\":\"lede\"," \
-			"\"fw_available\":false,\"active\":\"\",\"selected_ok\":false," \
-			"\"has_update\":false,\"model\":\"$(jesc "$(model_name)")\"," \
-			"\"sources\":{},\"img_url\":\"\",\"sha_url\":\"\",\"asset\":\"\",\"size\":0}"
-		exit 0
-	fi
+	# LEDE 家族已接线（2026-11-22）：不再早退，走正常检查（键/静态/tag 随家族切换）
 
 	# source 缺省 → 型号默认源（全型号统一 GitHub）
 	if [ -z "$src_in" ]; then
@@ -468,6 +489,10 @@ do_check() {
 			if gh_from_tag "$tag_in" "$size_in"; then gh_ok=true; fi
 		elif lb_probe; then
 			# 后端直接读固定版本文件（零 api）
+			gh_ok=true
+		fi
+		# tag 不合法（旧式形态/前缀与线不符）→ 回落固定文件自愈，不一票否决
+		if [ "$gh_ok" != "true" ] && [ -n "$tag_in" ] && lb_probe; then
 			gh_ok=true
 		fi
 		# 浏览器 API 顺带带回的体积优先（路由器侧 HEAD github 常超时/拿不到
@@ -567,8 +592,11 @@ do_download() {
 	official|lede) shift ;;
 	*) fam=$FAMILY ;;
 	esac
-	[ "$fam" != "lede" ] || fail "LEDE 固件源尚未提供，敬请期待"
-
+	# 显式 fw 与当前线不同 → 重接线（静态两件套随线切换）
+	if [ "$PROFILE" = "x86-efi" ] && [ "$fam" != "$FW_LINE" ]; then
+		FW_LINE=$fam
+		wire_fw_line "$fam"
+	fi
 	fw=${1:-0}
 	case "$fw" in ''|*[!0-9]*) fail "参数错误" ;; esac
 	[ "$PROFILE" != "unsupported" ] || fail "该型号暂未开放在线升级"
