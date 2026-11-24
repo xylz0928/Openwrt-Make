@@ -1,0 +1,3 @@
+# 本地临时与部署产物（tmp/test.file 为 test 工作流夹具，已跟踪不受影响）
+/tmp/
+/.deploy-tmp/
